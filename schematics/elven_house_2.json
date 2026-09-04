@@ -1,0 +1,2740 @@
+{
+  "format": "mineflayer-blueprint-v2",
+  "name": "elven_house_2",
+  "description": "Converted from elven-house-2-xlwxtirx.schem",
+  "size": {
+    "x": 21,
+    "y": 30,
+    "z": 24
+  },
+  "anchor": {
+    "x": 10,
+    "y": 0,
+    "z": 0,
+    "description": "Front-center ground block"
+  },
+  "palette": {
+    ".": "air",
+    "": {
+      "block": "coarse_dirt"
+    },
+    "": {
+      "block": "stone_bricks"
+    },
+    "": {
+      "block": "white_terracotta"
+    },
+    "": {
+      "block": "terracotta"
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_planks"
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "polished_tuff"
+    },
+    "": {
+      "block": "coal_block"
+    },
+    "": {
+      "block": "tuff"
+    },
+    "": {
+      "block": "cobblestone"
+    },
+    "": {
+      "block": "mossy_cobblestone"
+    },
+    "": {
+      "block": "dark_oak_planks"
+    },
+    "": {
+      "block": "acacia_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_leaves",
+      "properties": {
+        "distance": "2",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_leaves",
+      "properties": {
+        "distance": "1",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "large_fern",
+      "properties": {
+        "half": "lower"
+      }
+    },
+    "": {
+      "block": "peony",
+      "properties": {
+        "half": "lower"
+      }
+    },
+    "": {
+      "block": "rose_bush",
+      "properties": {
+        "half": "lower"
+      }
+    },
+    "": {
+      "block": "lilac",
+      "properties": {
+        "half": "lower"
+      }
+    },
+    "": {
+      "block": "acacia_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_leaves",
+      "properties": {
+        "distance": "3",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stripped_dark_oak_log",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    "": {
+      "block": "chiseled_tuff"
+    },
+    "": {
+      "block": "dark_oak_shelf",
+      "properties": {
+        "facing": "north",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "barrel",
+      "properties": {
+        "facing": "east",
+        "open": "false"
+      }
+    },
+    "": {
+      "block": "beehive",
+      "properties": {
+        "facing": "south",
+        "honey_level": "0"
+      }
+    },
+    "": {
+      "block": "crafting_table"
+    },
+    "": {
+      "block": "dark_oak_shelf",
+      "properties": {
+        "facing": "east",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "spruce_slab",
+      "properties": {
+        "type": "top",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cauldron"
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_button",
+      "properties": {
+        "face": "wall",
+        "facing": "south",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "chiseled_bookshelf",
+      "properties": {
+        "facing": "west",
+        "slot_0_occupied": "false",
+        "slot_1_occupied": "false",
+        "slot_2_occupied": "false",
+        "slot_3_occupied": "false",
+        "slot_4_occupied": "false",
+        "slot_5_occupied": "false"
+      }
+    },
+    "": {
+      "block": "spruce_log",
+      "properties": {
+        "axis": "x"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stone_brick_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stone_brick_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "composter",
+      "properties": {
+        "level": "0"
+      }
+    },
+    "": {
+      "block": "spruce_log",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "furnace",
+      "properties": {
+        "facing": "north",
+        "lit": "false"
+      }
+    },
+    "": {
+      "block": "andesite"
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "barrel",
+      "properties": {
+        "facing": "south",
+        "open": "false"
+      }
+    },
+    "": {
+      "block": "dead_brain_coral_block"
+    },
+    "": {
+      "block": "polished_andesite"
+    },
+    "": {
+      "block": "decorated_pot",
+      "properties": {
+        "cracked": "false",
+        "facing": "south",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "white_wool"
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "barrel",
+      "properties": {
+        "facing": "north",
+        "open": "false"
+      }
+    },
+    "": {
+      "block": "stone_brick_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "tuff_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "tall",
+        "south": "tall",
+        "up": "false",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "flowering_azalea_leaves",
+      "properties": {
+        "distance": "2",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "flowering_azalea_leaves",
+      "properties": {
+        "distance": "1",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "tuff_brick_wall",
+      "properties": {
+        "east": "tall",
+        "north": "tall",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "tuff_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "tall",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "tall"
+      }
+    },
+    "": {
+      "block": "polished_tuff_wall",
+      "properties": {
+        "east": "none",
+        "north": "tall",
+        "south": "tall",
+        "up": "false",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "flowering_azalea_leaves",
+      "properties": {
+        "distance": "3",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "tuff_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "tall",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "flowering_azalea_leaves",
+      "properties": {
+        "distance": "7",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "tuff_wall",
+      "properties": {
+        "east": "none",
+        "north": "tall",
+        "south": "tall",
+        "up": "false",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "tuff_wall",
+      "properties": {
+        "east": "tall",
+        "north": "none",
+        "south": "none",
+        "up": "false",
+        "waterlogged": "false",
+        "west": "tall"
+      }
+    },
+    "": {
+      "block": "tuff_brick_wall",
+      "properties": {
+        "east": "tall",
+        "north": "none",
+        "south": "none",
+        "up": "false",
+        "waterlogged": "false",
+        "west": "tall"
+      }
+    },
+    "": {
+      "block": "acacia_door",
+      "properties": {
+        "facing": "south",
+        "half": "lower",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "acacia_door",
+      "properties": {
+        "facing": "south",
+        "half": "lower",
+        "hinge": "left",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "large_fern",
+      "properties": {
+        "half": "upper"
+      }
+    },
+    "": {
+      "block": "peony",
+      "properties": {
+        "half": "upper"
+      }
+    },
+    "": {
+      "block": "rose_bush",
+      "properties": {
+        "half": "upper"
+      }
+    },
+    "": {
+      "block": "lilac",
+      "properties": {
+        "half": "upper"
+      }
+    },
+    "": {
+      "block": "glass_pane",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "stone"
+    },
+    "": {
+      "block": "flower_pot"
+    },
+    "": {
+      "block": "lily_of_the_valley"
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "smithing_table"
+    },
+    "": {
+      "block": "brewing_stand",
+      "properties": {
+        "has_bottle_0": "false",
+        "has_bottle_1": "false",
+        "has_bottle_2": "false"
+      }
+    },
+    "": {
+      "block": "glass_pane",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "wildflowers",
+      "properties": {
+        "facing": "east",
+        "flower_amount": "4"
+      }
+    },
+    "": {
+      "block": "acacia_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "anvil",
+      "properties": {
+        "facing": "south"
+      }
+    },
+    "": {
+      "block": "azure_bluet"
+    },
+    "": {
+      "block": "chest",
+      "properties": {
+        "facing": "east",
+        "type": "single",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stone_brick_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stone_brick_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "brown_carpet"
+    },
+    "": {
+      "block": "cornflower"
+    },
+    "": {
+      "block": "spruce_door",
+      "properties": {
+        "facing": "south",
+        "half": "lower",
+        "hinge": "right",
+        "open": "true",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "blue_orchid"
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_leaves",
+      "properties": {
+        "distance": "7",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cake",
+      "properties": {
+        "bites": "0"
+      }
+    },
+    "": {
+      "block": "iron_bars",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "glass"
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "wall_torch",
+      "item": "torch",
+      "properties": {
+        "facing": "east"
+      }
+    },
+    "": {
+      "block": "wall_torch",
+      "item": "torch",
+      "properties": {
+        "facing": "west"
+      }
+    },
+    "": {
+      "block": "wall_torch",
+      "item": "torch",
+      "properties": {
+        "facing": "north"
+      }
+    },
+    "": {
+      "block": "iron_bars",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "acacia_door",
+      "properties": {
+        "facing": "south",
+        "half": "upper",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "acacia_door",
+      "properties": {
+        "facing": "south",
+        "half": "upper",
+        "hinge": "left",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "oak_shelf",
+      "properties": {
+        "facing": "south",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stone_brick_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_shelf",
+      "properties": {
+        "facing": "south",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_door",
+      "properties": {
+        "facing": "south",
+        "half": "upper",
+        "hinge": "right",
+        "open": "true",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_slab",
+      "properties": {
+        "type": "bottom",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_leaves",
+      "properties": {
+        "distance": "4",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "tuff_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "spruce_slab",
+      "properties": {
+        "type": "bottom",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "turtle_egg",
+      "properties": {
+        "eggs": "4",
+        "hatch": "0"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "barrel",
+      "properties": {
+        "facing": "west",
+        "open": "false"
+      }
+    },
+    "": {
+      "block": "sea_pickle",
+      "properties": {
+        "pickles": "3",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "lantern",
+      "properties": {
+        "hanging": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stone_brick_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_planks"
+    },
+    "": {
+      "block": "torch"
+    },
+    "": {
+      "block": "stripped_dark_oak_log",
+      "properties": {
+        "axis": "z"
+      }
+    },
+    "": {
+      "block": "stripped_dark_oak_log",
+      "properties": {
+        "axis": "x"
+      }
+    },
+    "": {
+      "block": "dark_oak_slab",
+      "properties": {
+        "type": "top",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "smooth_sandstone"
+    },
+    "": {
+      "block": "mangrove_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_leaves",
+      "properties": {
+        "distance": "7",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "sand"
+    },
+    "": {
+      "block": "beehive",
+      "properties": {
+        "facing": "east",
+        "honey_level": "0"
+      }
+    },
+    "": {
+      "block": "polished_tuff_slab",
+      "properties": {
+        "type": "bottom",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "green_bed",
+      "properties": {
+        "facing": "east",
+        "occupied": "false",
+        "part": "foot"
+      }
+    },
+    "": {
+      "block": "green_bed",
+      "properties": {
+        "facing": "east",
+        "occupied": "false",
+        "part": "head"
+      }
+    },
+    "": {
+      "block": "moss_carpet"
+    },
+    "": {
+      "block": "green_carpet"
+    },
+    "": {
+      "block": "bookshelf"
+    },
+    "": {
+      "block": "chiseled_bookshelf",
+      "properties": {
+        "facing": "east",
+        "slot_0_occupied": "true",
+        "slot_1_occupied": "true",
+        "slot_2_occupied": "true",
+        "slot_3_occupied": "true",
+        "slot_4_occupied": "false",
+        "slot_5_occupied": "true"
+      }
+    },
+    "": {
+      "block": "chest",
+      "properties": {
+        "facing": "north",
+        "type": "left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "chest",
+      "properties": {
+        "facing": "north",
+        "type": "right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_door",
+      "properties": {
+        "facing": "south",
+        "half": "lower",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "spruce_door",
+      "properties": {
+        "facing": "west",
+        "half": "lower",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "decorated_pot",
+      "properties": {
+        "cracked": "false",
+        "facing": "north",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "acacia_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_door",
+      "properties": {
+        "facing": "south",
+        "half": "lower",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_door",
+      "properties": {
+        "facing": "east",
+        "half": "lower",
+        "hinge": "left",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "polished_tuff_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "scaffolding",
+      "properties": {
+        "bottom": "false",
+        "distance": "0",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "polished_tuff_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "dark_oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "dark_oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "white_candle",
+      "properties": {
+        "candles": "3",
+        "lit": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "chiseled_bookshelf",
+      "properties": {
+        "facing": "east",
+        "slot_0_occupied": "true",
+        "slot_1_occupied": "true",
+        "slot_2_occupied": "true",
+        "slot_3_occupied": "true",
+        "slot_4_occupied": "true",
+        "slot_5_occupied": "true"
+      }
+    },
+    "": {
+      "block": "spruce_door",
+      "properties": {
+        "facing": "south",
+        "half": "upper",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "spruce_door",
+      "properties": {
+        "facing": "west",
+        "half": "upper",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_leaves",
+      "properties": {
+        "distance": "1",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_door",
+      "properties": {
+        "facing": "south",
+        "half": "upper",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "oak_door",
+      "properties": {
+        "facing": "east",
+        "half": "upper",
+        "hinge": "left",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "lantern",
+      "properties": {
+        "hanging": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_shelf",
+      "properties": {
+        "facing": "east",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "chiseled_bookshelf",
+      "properties": {
+        "facing": "east",
+        "slot_0_occupied": "false",
+        "slot_1_occupied": "true",
+        "slot_2_occupied": "true",
+        "slot_3_occupied": "false",
+        "slot_4_occupied": "true",
+        "slot_5_occupied": "true"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_slab",
+      "properties": {
+        "type": "bottom",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_slab",
+      "properties": {
+        "type": "double",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "iron_chain",
+      "properties": {
+        "axis": "y",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "chest",
+      "properties": {
+        "facing": "west",
+        "type": "right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "chest",
+      "properties": {
+        "facing": "west",
+        "type": "left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "loom",
+      "properties": {
+        "facing": "west"
+      }
+    },
+    "": {
+      "block": "fletching_table"
+    },
+    "": {
+      "block": "dark_oak_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "yellow_terracotta"
+    },
+    "": {
+      "block": "mangrove_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobweb"
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_shelf",
+      "properties": {
+        "facing": "east",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_shelf",
+      "properties": {
+        "facing": "west",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_shelf",
+      "properties": {
+        "facing": "north",
+        "powered": "false",
+        "side_chain": "unconnected",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "packed_mud"
+    },
+    "": {
+      "block": "campfire",
+      "properties": {
+        "facing": "west",
+        "lit": "true",
+        "signal_fire": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mud_bricks"
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "mangrove_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mangrove_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "iron_bars",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    }
+  },
+  "layers": [
+    {
+      "y": 0,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "................",
+        ".....................",
+        "............",
+        ".............",
+        "............",
+        "...........",
+        "...........",
+        "...........",
+        "................",
+        "................",
+        "................",
+        "..................",
+        "..................",
+        "..................",
+        "..........",
+        "................",
+        ".................",
+        ".................",
+        "..................",
+        "...................",
+        "..................."
+      ]
+    },
+    {
+      "y": 1,
+      "rows": [
+        ".....................",
+        ".....................",
+        "................",
+        ".............",
+        "........",
+        "......",
+        ".....",
+        "..........",
+        ".........",
+        "........",
+        "........",
+        "...........",
+        "...........",
+        "......",
+        "......",
+        ".........",
+        ".........",
+        "...................",
+        "...................",
+        "...................",
+        "...................",
+        "...................",
+        "......",
+        "....................."
+      ]
+    },
+    {
+      "y": 2,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "...............",
+        "............",
+        "...........",
+        ".............",
+        "............",
+        "..........",
+        ".............",
+        ".............",
+        ".............",
+        "................",
+        "...........",
+        ".........",
+        "............",
+        "............",
+        "...................",
+        ".................",
+        "...................",
+        "...................",
+        "..................",
+        "......",
+        "....................."
+      ]
+    },
+    {
+      "y": 3,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "..................",
+        ".............",
+        "..........",
+        "...............",
+        "...............",
+        "...............",
+        "..............",
+        "..............",
+        "..............",
+        ".................",
+        "..............",
+        "............",
+        "...............",
+        "..................",
+        ".....................",
+        "...................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "................",
+        "....................."
+      ]
+    },
+    {
+      "y": 4,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "................",
+        "..............",
+        "............",
+        "............",
+        "...........",
+        ".............",
+        "............",
+        "............",
+        ".............",
+        "................",
+        "............",
+        ".........",
+        "...............",
+        "..................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "...................",
+        "....................."
+      ]
+    },
+    {
+      "y": 5,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "..............",
+        ".........",
+        ".........",
+        ".........",
+        "........",
+        ".........",
+        ".......",
+        ".......",
+        ".......",
+        "........",
+        ".........",
+        "..................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 6,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "................",
+        "..............",
+        "........",
+        "...........",
+        "..........",
+        "..........",
+        "............",
+        "..........",
+        "........",
+        "..........",
+        "...........",
+        ".........",
+        "................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 7,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "..................",
+        ".............",
+        ".............",
+        "..............",
+        "...............",
+        "..........",
+        "...............",
+        "..............",
+        ".............",
+        "................",
+        "................",
+        "...........",
+        "................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 8,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "..................",
+        ".......",
+        "...........",
+        "................",
+        "................",
+        "..........",
+        "...............",
+        "................",
+        ".............",
+        "...............",
+        "................",
+        "...........",
+        "..................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 9,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "............",
+        "...........",
+        "............",
+        "...........",
+        "................",
+        ".........",
+        "...........",
+        "......",
+        "......",
+        ".........",
+        ".............",
+        "...........",
+        ".............",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 10,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "..............",
+        ".............",
+        ".............",
+        ".........",
+        "...........",
+        "...........",
+        "........",
+        "........",
+        "..........",
+        "...........",
+        "...............",
+        "..............",
+        "...............",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 11,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".................",
+        "..............",
+        "..............",
+        ".......",
+        "........",
+        ".............",
+        "........",
+        "........",
+        "..............",
+        "...........",
+        "...............",
+        ".............",
+        ".................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 12,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".................",
+        "................",
+        ".................",
+        ".........",
+        "..........",
+        "........",
+        ".........",
+        "........",
+        ".............",
+        ".............",
+        "................",
+        "...............",
+        ".................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 13,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".................",
+        "................",
+        "................",
+        ".............",
+        ".........",
+        "..........",
+        "..........",
+        "..............",
+        "............",
+        "...............",
+        "................",
+        "................",
+        ".................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 14,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "................",
+        "..................",
+        "..................",
+        "................",
+        ".............",
+        "........",
+        "..............",
+        "................",
+        "...........",
+        "................",
+        "..................",
+        "..................",
+        "................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 15,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "........",
+        "...................",
+        "..................",
+        "..............",
+        "...................",
+        "...................",
+        "..................",
+        "..................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 16,
+      "rows": [
+        ".....................",
+        ".....................",
+        "....................",
+        "..................",
+        "....................",
+        "....................",
+        "..................",
+        "..................",
+        ".........",
+        "...................",
+        "..................",
+        ".................",
+        "..................",
+        "....................",
+        "....................",
+        "..................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 17,
+      "rows": [
+        ".....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "..............",
+        "..................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 18,
+      "rows": [
+        ".....................",
+        "....................",
+        ".....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "..................",
+        "..................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        ".....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 19,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        "....................",
+        "...................",
+        "....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 20,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        "...................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 21,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        "..................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 22,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        "..................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 23,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 24,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 25,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 26,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 27,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 28,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    },
+    {
+      "y": 29,
+      "rows": [
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        "....................."
+      ]
+    }
+  ],
+  "importNotes": {
+    "sourceFormatVersion": 3,
+    "sourceDataVersion": 4903,
+    "sourceMinY": 6,
+    "terrainTrimmed": true,
+    "placedBlocks": 1926,
+    "omittedBlockEntities": 57,
+    "omittedEntities": 14,
+    "substitutions": {
+      "water_cauldron": "cauldron",
+      "potted_blue_orchid": "flower_pot",
+      "polished_cinnabar_slab": "polished_tuff_slab",
+      "polished_cinnabar_stairs": "polished_tuff_stairs",
+      "potted_azure_bluet": "flower_pot",
+      "potted_flowering_azalea_bush": "flower_pot",
+      "potted_dandelion": "flower_pot",
+      "potted_poppy": "flower_pot"
+    }
+  }
+}

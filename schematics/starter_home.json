@@ -1,0 +1,85 @@
+{
+  "format": "mineflayer-blueprint-v1",
+  "name": "starter_home",
+  "description": "A simple 7x5x7 wooden starter house with a two-block-high front doorway.",
+  "size": {
+    "x": 7,
+    "y": 5,
+    "z": 7
+  },
+  "anchor": {
+    "x": 3,
+    "y": 0,
+    "z": 0,
+    "description": "Front-center floor block; positive Z points into the house."
+  },
+  "palette": {
+    "P": "any_planks",
+    ".": "air"
+  },
+  "materialEstimate": {
+    "any_planks": 168
+  },
+  "layers": [
+    {
+      "y": 0,
+      "rows": [
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP"
+      ]
+    },
+    {
+      "y": 1,
+      "rows": [
+        "PPP.PPP",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "PPPPPPP"
+      ]
+    },
+    {
+      "y": 2,
+      "rows": [
+        "PPP.PPP",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "PPPPPPP"
+      ]
+    },
+    {
+      "y": 3,
+      "rows": [
+        "PPPPPPP",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "P.....P",
+        "PPPPPPP"
+      ]
+    },
+    {
+      "y": 4,
+      "rows": [
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP",
+        "PPPPPPP"
+      ]
+    }
+  ]
+}

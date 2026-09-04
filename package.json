@@ -1,0 +1,26 @@
+{
+  "name": "mineflayer-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A configurable Mineflayer Minecraft bot starter",
+  "main": "src/bot.js",
+  "scripts": {
+    "start": "node --expose-gc src/bot.js",
+    "check": "node --check src/bot.js && node --check src/process-lock.js && node --check src/controller/bot-controller.js && node --check src/controller/local-intent.js && node --check src/controller/selection-manager.js && node --check src/controller/action-executor.js && node --check src/controller/event-monitor.js && node --check src/controller/tool-manager.js && node --check src/controller/tool-compatibility.js && node --check src/controller/auto-disposer.js && node --check src/controller/block-tracker.js && node --check src/controller/inventory-tracker.js && node --check src/controller/inventory-policy.js && node --check src/controller/entity-tracker.js && node --check src/controller/container-tracker.js && node --check src/controller/landmark-store.js && node --check src/controller/blueprint-loader.js && node --check src/controller/checkpoint-store.js && node --check src/tasks/task.js && node --check src/tasks/task-runner.js && node --check src/tasks/recovery-manager.js && node --check src/tasks/acquire-item-task.js && node --check src/tasks/blueprint-task.js && node --check src/ai/planner.js && node --check scripts/convert-schem.js",
+    "test": "node --test",
+    "probe:ai": "node scripts/probe-ai.js",
+    "convert:schem": "node scripts/convert-schem.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^17.0.0",
+    "mineflayer": "^4.0.0",
+    "mineflayer-collectblock": "^1.6.0",
+    "mineflayer-pathfinder": "^2.4.5",
+    "openai": "^7.9.0",
+    "vec3": "^0.2.0",
+    "zod": "^4.5.4"
+  }
+}
