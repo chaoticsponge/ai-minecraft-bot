@@ -26,6 +26,12 @@ function loadConfig() {
     throw new Error('MC_AUTH must be either offline or microsoft')
   }
 
+  const commandPrefix = process.env.AI_COMMAND_PREFIX ?? ''
+  const publicChatCommands = readBoolean('PUBLIC_CHAT_COMMANDS', false)
+  if (publicChatCommands && !commandPrefix.trim()) {
+    throw new Error('AI_COMMAND_PREFIX must be set when PUBLIC_CHAT_COMMANDS=true')
+  }
+
   return {
     minecraft: {
       host: process.env.MC_HOST || 'localhost',
@@ -54,7 +60,8 @@ function loadConfig() {
         .map((name) => name.trim().toLowerCase())
         .filter(Boolean)
     ),
-    commandPrefix: process.env.AI_COMMAND_PREFIX ?? '',
+    commandPrefix,
+    publicChatCommands,
     checkpointFile: path.resolve(process.env.BOT_CHECKPOINT_FILE || '.state/active-goal.json'),
     landmarksFile: path.resolve(process.env.BOT_LANDMARKS_FILE || '.state/landmarks.json'),
     schematicsDirectory: path.resolve(process.env.SCHEMATICS_DIRECTORY || 'schematics'),

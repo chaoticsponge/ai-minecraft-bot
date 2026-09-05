@@ -84,8 +84,21 @@ class BlueprintLoader {
 
   materials(blueprint) {
     const counts = {}
-    for (const block of this.blocks(blueprint)) counts[block.material] = (counts[block.material] || 0) + 1
+    for (const block of this.blocks(blueprint)) {
+      counts[block.material] = (counts[block.material] || 0) + this.itemCount(block)
+    }
     return counts
+  }
+
+  itemCount(entry) {
+    const block = entry.block || entry.material
+    const property = block?.endsWith('_candle') ? 'candles'
+      : block === 'sea_pickle' ? 'pickles'
+        : block === 'turtle_egg' ? 'eggs'
+          : ['pink_petals', 'wildflowers'].includes(block) ? 'flower_amount'
+            : null
+    const count = property ? Number(entry.properties?.[property]) : 1
+    return Number.isInteger(count) && count >= 1 && count <= 4 ? count : 1
   }
 }
 

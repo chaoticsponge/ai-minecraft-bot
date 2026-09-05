@@ -68,10 +68,16 @@ function connect() {
     bot.on('whisper', (username, message) => {
       controller.handleWhisper(username, message).catch((error) => console.error('Whisper handler failed:', error))
     })
+    if (config.publicChatCommands) {
+      bot.on('chat', (username, message) => {
+        controller.handleWhisper(username, message).catch((error) => console.error('Chat handler failed:', error))
+      })
+    }
     console.log(`Spawned as ${bot.username} at ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`)
     console.log(`AI: ${config.ai.model} at ${config.ai.baseURL}`)
     const commandPrefix = config.commandPrefix ? `${config.commandPrefix} ` : ''
     console.log(`Whisper commands: /w ${bot.username} ${commandPrefix}<goal>`)
+    if (config.publicChatCommands) console.log(`Public chat commands: ${commandPrefix}<goal>`)
     if (config.autoDisposeItems.size > 0) {
       console.log(`Auto-dispose: ${[...config.autoDisposeItems].join(', ')}`)
     }

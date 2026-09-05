@@ -2657,9 +2657,13 @@ class ActionExecutor {
       if (movements) movements.allow1by1towers = false
       try {
         return await this.gotoBounded(goal, signal, radius)
+      } catch (error) {
+        if (error.name === 'AbortError' || !action.trackTemporaryScaffold) throw error
+        console.warn(`Walking-only placement approach failed; trying tracked scaffolding: ${error.message}`)
       } finally {
         if (movements) movements.allow1by1towers = previousTower
       }
+      return this.gotoBounded(goal, signal, radius)
     }
     this.assertNearby(target)
     const targetBlock = this.bot.blockAt(target)
@@ -2678,27 +2682,41 @@ class ActionExecutor {
       ['campfire', 'soul_campfire', 'decorated_pot'].includes(expectedBlock)
     const facesAwayFromPlayer = /(?:_trapdoor|_chest|_furnace|_barrel|_beehive|_bookshelf|_shelf|_loom)$/.test(expectedBlock)
     const orientationByYaw = facesWithPlayer || facesAwayFromPlayer
+    const yawDirection = desiredFacing && orientationByYaw
+      ? (expectedBlock.endsWith('_stairs') || facesAwayFromPlayer
+          ? desiredFacing.scaled(-1)
+          : desiredFacing)
+      : null
     if (desiredFacing) {
       // Stairs, doors, beds, and campfires follow the player's look direction;
       // containers and top-placed trapdoors face back toward the player.
-      const stanceDirection = facesWithPlayer ? desiredFacing.scaled(-1) : desiredFacing
+      const stanceDirection = yawDirection ? yawDirection.scaled(-1) : desiredFacing
       const stances = [2, 3, 1].flatMap((distance) => [
         target.plus(stanceDirection.scaled(distance)),
         target.plus(stanceDirection.scaled(distance)).offset(0, 1, 0)
       ])
       const stance = stances.find((candidate) => this.canStandAt(candidate))
+      let reachedStance = Boolean(stance && this.bot.entity.position.distanceTo(stance) <= 0.75)
       if (stance && this.bot.entity.position.distanceTo(stance) > 0.75) {
-        await gotoPlacement(new goals.GoalBlock(stance.x, stance.y, stance.z), 10)
+        try {
+          await gotoPlacement(new goals.GoalBlock(stance.x, stance.y, stance.z), 10)
+          reachedStance = this.bot.entity.position.distanceTo(stance) <= 0.75
+        } catch (error) {
+          if (error.name === 'AbortError') throw error
+          // A geometrically valid stance can be sealed off by the partial
+          // structure. The final cardinal yaw lock is enough when the block is
+          // already within reach from the bot's current position.
+          console.warn(`Canonical ${action.block} stance is unreachable; using current reachable position`)
+        }
       }
-      if (stance) {
+      if (reachedStance) {
         await this.bot.lookAt(target.offset(0.5, 0.5, 0.5), !orientationByYaw)
       } else if (orientationByYaw) {
         // Facing is based on yaw, not on which side of the block the player
         // occupies. Dense builds often have no free canonical stance, so aim
         // along the required cardinal direction from the current position.
-        const lookDirection = facesWithPlayer ? desiredFacing : desiredFacing.scaled(-1)
         const eye = this.bot.entity.position.offset(0, 1.62, 0)
-        await this.bot.lookAt(eye.plus(lookDirection.scaled(4)), true)
+        await this.bot.lookAt(eye.plus(yawDirection.scaled(4)), true)
       }
     }
     const horizontalFaces = [
@@ -2719,6 +2737,11 @@ class ActionExecutor {
       // recovery create a useful side support rather than retrying the same
       // impossible placement.
       faces = [...horizontalFaces, new Vec3(0, -1, 0)]
+    }
+    if (['lantern', 'soul_lantern'].includes(expectedBlock) && action.properties?.hanging != null) {
+      faces = String(action.properties.hanging) === 'true'
+        ? [new Vec3(0, -1, 0)]
+        : [new Vec3(0, 1, 0)]
     }
     // Logs and pillars derive their axis exclusively from the clicked face.
     // Falling back to another face silently creates a permanently wrong state.
@@ -2825,6 +2848,20 @@ class ActionExecutor {
     }
     // Creating support equips the scaffold block, so the intended item must be
     // equipped only after all support work and movement have finished.
+    // Pathfinder movement also changes yaw, so directional blocks must lock
+    // their cardinal aim here, immediately before the placement packet.
+    if (yawDirection) {
+      // In this Mineflayer version force-look updates the desired yaw, while
+      // the actual player-look packet is emitted on the next physics tick.
+      // Cancel residual path movement first, then allow one tick to transmit
+      // the cardinal yaw before sending use_item_on.
+      this.bot.pathfinder?.setGoal?.(null)
+      this.bot.clearControlStates?.()
+      await wait(75, signal)
+      const eye = this.bot.entity.position.offset(0, 1.62, 0)
+      await this.bot.lookAt(eye.plus(yawDirection.scaled(4)), true)
+      await wait(75, signal)
+    }
     await this.bot.equip(item, 'hand')
     const placementOptions = {
       swingArm: 'right', forceLook: orientationByYaw ? 'ignore' : true,
@@ -2893,11 +2930,18 @@ class ActionExecutor {
         `feet=${feet}, target=${placed?.name || 'unloaded'}`
       )
     }
+    placed = await this.configurePlacedBlockState(action, target, placed, signal)
     const actual = placed?.getProperties?.() || {}
     const mismatches = []
     if (placed?.name !== expectedBlock) mismatches.push(`block=${placed?.name || 'unloaded'} instead of ${expectedBlock}`)
     const strictProperties = new Set(['facing', 'axis', 'half'])
     if (expectedBlock.endsWith('_slab')) strictProperties.add('type')
+    if (/(?:_door|_trapdoor|_fence_gate)$/.test(expectedBlock)) strictProperties.add('open')
+    if (['lantern', 'soul_lantern'].includes(expectedBlock)) strictProperties.add('hanging')
+    if (expectedBlock.endsWith('_candle')) strictProperties.add('candles')
+    if (expectedBlock === 'sea_pickle') strictProperties.add('pickles')
+    if (expectedBlock === 'turtle_egg') strictProperties.add('eggs')
+    if (['pink_petals', 'wildflowers'].includes(expectedBlock)) strictProperties.add('flower_amount')
     for (const [name, expected] of Object.entries(action.properties || {})) {
       if (String(actual[name]) !== String(expected)) {
         console.warn(`Placed ${action.block} at ${target} with ${name}=${actual[name]} instead of requested ${expected}`)
@@ -2909,9 +2953,18 @@ class ActionExecutor {
     if (action.verifyState && mismatches.length) {
       try {
         if (placed?.diggable) {
-          await this.bot.tool.equipForBlock(placed, { requireHarvest: false, getFromChest: false })
-          await cancellable(this.bot.dig(placed, true), signal, () => this.bot.stopDigging())
-          await this.collectDropsNear(target, signal, null, 4, 500)
+          await this.clearBuildObstruction(target, signal, true)
+          if (!action.stateRepairAttempted && placed.name === expectedBlock) {
+            // The server occasionally applies a valid click to stale block
+            // state (most visibly merging a slab into a double slab). Repair
+            // the result locally once instead of abandoning the entire build.
+            await wait(500, signal)
+            const recoveredItem = this.bot.inventory.items().some((entry) => entry.name === action.block)
+            if (recoveredItem && this.isPassable(this.bot.blockAt(target))) {
+              console.warn(`Retrying ${action.block} at ${target} after state mismatch`)
+              return this.place({ ...action, stateRepairAttempted: true }, signal)
+            }
+          }
         }
       } catch (cleanupError) {
         console.warn(`Could not remove mismatched schematic block at ${target}: ${cleanupError.message}`)
@@ -2919,6 +2972,49 @@ class ActionExecutor {
       throw new Error(`schematic placement mismatch at ${target}: ${mismatches.join(', ')}`)
     }
     return `Placed ${action.block} at ${target.x}, ${target.y}, ${target.z}`
+  }
+
+  async configurePlacedBlockState(action, target, initialBlock, signal) {
+    const expectedBlock = action.expectedBlock || action.block
+    let placed = initialBlock
+    const waitForProperty = async (name, expected, timeout = 1200) => {
+      const deadline = Date.now() + timeout
+      do {
+        placed = this.bot.blockAt(target)
+        if (String(placed?.getProperties?.()?.[name]) === String(expected)) return true
+        if (Date.now() >= deadline) return false
+        await wait(100, signal)
+      } while (true)
+    }
+
+    if (/(?:_door|_trapdoor|_fence_gate)$/.test(expectedBlock) && action.properties?.open != null) {
+      const expectedOpen = String(action.properties.open)
+      if (String(placed?.getProperties?.()?.open) !== expectedOpen) {
+        await this.bot.activateBlock(placed)
+        await waitForProperty('open', expectedOpen)
+      }
+    }
+
+    const countProperty = expectedBlock.endsWith('_candle') ? 'candles'
+      : expectedBlock === 'sea_pickle' ? 'pickles'
+        : expectedBlock === 'turtle_egg' ? 'eggs'
+          : ['pink_petals', 'wildflowers'].includes(expectedBlock) ? 'flower_amount'
+            : null
+    const expectedCount = countProperty ? Number(action.properties?.[countProperty]) : 1
+    if (countProperty && Number.isInteger(expectedCount) && expectedCount > 1) {
+      let actualCount = Number(placed?.getProperties?.()?.[countProperty]) || 1
+      while (actualCount < expectedCount) {
+        const item = this.bot.inventory.items().find((entry) => entry.name === action.block)
+        if (!item) break
+        await this.bot.equip(item, 'hand')
+        await this.bot.activateBlock(placed)
+        const changed = await waitForProperty(countProperty, actualCount + 1)
+        const nextCount = Number(placed?.getProperties?.()?.[countProperty]) || actualCount
+        if (!changed || nextCount <= actualCount) break
+        actualCount = nextCount
+      }
+    }
+    return this.bot.blockAt(target)
   }
 
   canClearBuildObstruction(block) {
@@ -2929,24 +3025,43 @@ class ActionExecutor {
     const block = this.bot.blockAt(position)
     if (!block || this.isPassable(block)) return true
     if (!this.canClearBuildObstruction(block) && !(reclaimRequiredMaterial && block.diggable)) return false
-    await this.bot.tool.equipForBlock(block, { requireHarvest: false, getFromChest: false })
-    let digError = null
-    try {
-      await cancellable(this.bot.dig(block, true), signal, () => this.bot.stopDigging())
-    } catch (error) {
-      if (error.name === 'AbortError') throw error
-      digError = error
+    let cleared = false
+    let lastDigError = null
+    for (let attempt = 0; attempt < 2 && !cleared; attempt += 1) {
+      const current = this.bot.blockAt(position)
+      if (!current || this.isPassable(current)) {
+        cleared = true
+        break
+      }
+      await this.bot.tool.equipForBlock(current, { requireHarvest: false, getFromChest: false })
+      lastDigError = null
+      try {
+        await cancellable(this.bot.dig(current, true), signal, () => this.bot.stopDigging())
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+        lastDigError = error
+      }
+      // Require a short continuous empty observation. On busy servers a slab
+      // can briefly appear as air client-side and then snap back; immediately
+      // placing another slab in that window creates an unintended double slab.
+      const confirmationDeadline = Date.now() + (lastDigError ? 1500 : 700)
+      let clearSince = null
+      while (Date.now() < confirmationDeadline) {
+        if (this.isPassable(this.bot.blockAt(position))) {
+          clearSince ||= Date.now()
+          if (Date.now() - clearSince >= 250) {
+            cleared = true
+            break
+          }
+        } else {
+          clearSince = null
+        }
+        await wait(50, signal)
+      }
+      if (!cleared && attempt === 0) console.warn(`Build obstruction reappeared at ${position}; retrying removal once`)
     }
-    // Mineflayer may time out waiting for blockUpdate even though the server
-    // accepted the dig. Large builds should trust the observed world after a
-    // short grace period, just as schematic placement does.
-    const confirmationDeadline = Date.now() + (digError ? 1500 : 200)
-    while (!this.isPassable(this.bot.blockAt(position)) && Date.now() < confirmationDeadline) {
-      await wait(100, signal)
-    }
-    const cleared = this.isPassable(this.bot.blockAt(position))
-    if (digError && cleared) console.log(`Confirmed delayed obstruction removal at ${position}`)
-    if (digError && !cleared) throw digError
+    if (lastDigError && cleared) console.log(`Confirmed delayed obstruction removal at ${position}`)
+    if (lastDigError && !cleared) throw lastDigError
     if (cleared && reclaimRequiredMaterial) {
       await this.collectDropsNear(position, signal, null, 4, 500)
       console.log(`Reclaimed misplaced ${block.name} from build site at ${position}`)

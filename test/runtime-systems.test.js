@@ -33,6 +33,15 @@ test('validates and counts the starter home blueprint', () => {
   assert.throws(() => loader.load('../starter_home'))
 })
 
+test('blueprint materials count stacked decorative block items', () => {
+  const loader = new BlueprintLoader(path.resolve(__dirname, '../schematics'))
+  const materials = loader.materials(loader.load('elven_house_2'))
+  assert.equal(materials.white_candle, 3)
+  assert.equal(materials.sea_pickle, 3)
+  assert.equal(materials.turtle_egg, 4)
+  assert.equal(materials.wildflowers, 8)
+})
+
 test('block tracker caches scans and cools down unreachable targets', () => {
   class Bot extends EventEmitter {}
   const bot = new Bot()
@@ -348,6 +357,11 @@ test('schematic resume ignores neighbor-derived state but preserves placed orien
   assert.equal(task.matchesEntry(stair, {
     material: 'stone_brick_stairs', properties: { facing: 'north', half: 'bottom' }
   }), false)
+  assert.equal(task.matchesEntry({
+    name: 'spruce_trapdoor', getProperties: () => ({ facing: 'north', half: 'top', open: false })
+  }, {
+    material: 'spruce_trapdoor', properties: { facing: 'north', half: 'top', open: 'true' }
+  }), false)
 })
 
 test('schematic preflight rejects required solid obstructions but ignores optional decor positions', () => {
@@ -374,6 +388,31 @@ test('schematic preflight permits a misplaced required material to be reclaimed'
     { material: 'stone_bricks', position: new Vec3(0, 64, 0) },
     { material: 'spruce_planks', position: new Vec3(1, 64, 0) }
   ]), true)
+})
+
+test('schematic construction retries a target restored after obstruction cleanup', async () => {
+  const target = new Vec3(2, 64, 3)
+  let solid = true
+  let attempts = 0
+  const bot = {
+    inventory: { items: () => [] },
+    blockAt: (position) => solid
+      ? { name: 'spruce_slab', boundingBox: 'block', position, diggable: true }
+      : { name: 'air', boundingBox: 'empty', position }
+  }
+  const task = new BlueprintTask(bot, {
+    clearBuildObstruction: async () => {
+      attempts += 1
+      // The first server-side removal appears to succeed and then restores;
+      // the second one is durable.
+      if (attempts > 1) solid = false
+      return true
+    }
+  }, {})
+  assert.equal(await task.clearBuildPosition(
+    target, new AbortController().signal, true
+  ), true)
+  assert.equal(attempts, 2)
 })
 
 test('schematic placement raises its floor one block above flat natural terrain', () => {
@@ -585,9 +624,9 @@ test('directional schematic blocks can use an elevated stance above the foundati
     type: 'place', block: 'spruce_stairs', expectedBlock: 'spruce_stairs', verifyState: true,
     x: 0, y: 64, z: 0, properties: { facing: 'north' }
   }, new AbortController().signal)
-  assert.deepEqual(stance, new Vec3(0, 65, 2))
+  assert.deepEqual(stance, new Vec3(0, 65, -2))
   assert.equal(looked, true)
-  assert.equal(forcedLook, false)
+  assert.equal(forcedLook, true)
   assert.equal(placementOptions.forceLook, 'ignore')
 })
 
@@ -617,7 +656,36 @@ test('directional schematic blocks use explicit yaw when their canonical stance 
     type: 'place', block: 'stone_brick_stairs', expectedBlock: 'stone_brick_stairs', verifyState: true,
     x: 0, y: 65, z: 0, properties: { facing: 'east', half: 'bottom' }
   }, new AbortController().signal)
-  assert.ok(lookedAt.x > start.x + 3)
+  assert.ok(lookedAt.x < start.x - 3)
+  assert.equal(placed, true)
+})
+
+test('directional schematic blocks tolerate an unreachable canonical stance when already in reach', async () => {
+  const target = new Vec3(0, 65, 0)
+  let placed = false
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => true
+  executor.gotoBounded = async () => { throw new Error('No path to the goal!') }
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, -2) },
+    pathfinder: { movements: { allow1by1towers: true } },
+    inventory: { items: () => [{ name: 'stone_brick_stairs', type: 1, count: 1 }] },
+    blockAt: (position) => position.equals(target)
+      ? (placed
+          ? { name: 'stone_brick_stairs', boundingBox: 'block', position, getProperties: () => ({ facing: 'east', half: 'bottom' }) }
+          : { name: 'air', boundingBox: 'empty', position })
+      : { name: 'stone', boundingBox: 'block', position },
+    equip: async () => {},
+    lookAt: async () => {},
+    _placeBlockWithOptions: async () => { placed = true }
+  }
+  await executor.place({
+    type: 'place', block: 'stone_brick_stairs', expectedBlock: 'stone_brick_stairs', verifyState: true,
+    trackTemporaryScaffold: () => {},
+    x: 0, y: 65, z: 0, properties: { facing: 'east', half: 'bottom' }
+  }, new AbortController().signal)
   assert.equal(placed, true)
 })
 
@@ -732,6 +800,127 @@ test('schematic blocks prefer reachable side support over a ceiling', async () =
   assert.deepEqual(usedFace, new Vec3(1, 0, 0))
 })
 
+test('schematic hanging lanterns place against the block above', async () => {
+  const target = new Vec3(0, 64, 0)
+  let placed = false
+  let usedFace = null
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => false
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, -2) },
+    inventory: { items: () => [{ name: 'lantern', type: 1, count: 1 }] },
+    blockAt: (position) => {
+      if (position.equals(target)) return placed
+        ? { name: 'lantern', boundingBox: 'empty', position, getProperties: () => ({ hanging: true }) }
+        : { name: 'air', boundingBox: 'empty', position }
+      if (position.equals(target.offset(0, 1, 0))) return { name: 'stone', boundingBox: 'block', position }
+      return { name: 'air', boundingBox: 'empty', position }
+    },
+    equip: async () => {},
+    _placeBlockWithOptions: async (reference, face) => { usedFace = face; placed = true }
+  }
+  await executor.place({
+    type: 'place', block: 'lantern', expectedBlock: 'lantern', verifyState: true,
+    x: 0, y: 64, z: 0, properties: { hanging: 'true' }
+  }, new AbortController().signal)
+  assert.deepEqual(usedFace, new Vec3(0, -1, 0))
+})
+
+test('schematic placement toggles blocks to their requested open state', async () => {
+  const target = new Vec3(0, 64, 0)
+  let placed = false
+  let open = false
+  let activations = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => false
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, -2) },
+    inventory: { items: () => [{ name: 'spruce_trapdoor', type: 1, count: 1 }] },
+    blockAt: (position) => position.equals(target)
+      ? (placed
+          ? { name: 'spruce_trapdoor', boundingBox: 'empty', position, getProperties: () => ({ facing: 'north', half: 'top', open }) }
+          : { name: 'air', boundingBox: 'empty', position })
+      : { name: 'stone', boundingBox: 'block', position },
+    equip: async () => {},
+    lookAt: async () => {},
+    activateBlock: async () => { activations += 1; open = true },
+    _placeBlockWithOptions: async () => { placed = true }
+  }
+  await executor.place({
+    type: 'place', block: 'spruce_trapdoor', expectedBlock: 'spruce_trapdoor', verifyState: true,
+    x: 0, y: 64, z: 0, properties: { facing: 'north', half: 'top', open: 'true' }
+  }, new AbortController().signal)
+  assert.equal(activations, 1)
+  assert.equal(open, true)
+})
+
+test('schematic placement stacks candles to the requested count', async () => {
+  const target = new Vec3(0, 64, 0)
+  let placed = false
+  let candles = 0
+  let activations = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => false
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, -2) },
+    inventory: { items: () => [{ name: 'white_candle', type: 1, count: 3 }] },
+    blockAt: (position) => position.equals(target)
+      ? (placed
+          ? { name: 'white_candle', boundingBox: 'empty', position, getProperties: () => ({ candles }) }
+          : { name: 'air', boundingBox: 'empty', position })
+      : { name: 'stone', boundingBox: 'block', position },
+    equip: async () => {},
+    activateBlock: async () => { activations += 1; candles += 1 },
+    _placeBlockWithOptions: async () => { placed = true; candles = 1 }
+  }
+  await executor.place({
+    type: 'place', block: 'white_candle', expectedBlock: 'white_candle', verifyState: true,
+    x: 0, y: 64, z: 0, properties: { candles: '3' }
+  }, new AbortController().signal)
+  assert.equal(activations, 2)
+  assert.equal(candles, 3)
+})
+
+test('schematic placement repairs one server-side state mismatch locally', async () => {
+  const target = new Vec3(0, 64, 0)
+  let state = 'air'
+  let placements = 0
+  let clears = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => false
+  executor.clearBuildObstruction = async () => { clears += 1; state = 'air'; return true }
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, -2) },
+    inventory: { items: () => [{ name: 'spruce_slab', type: 1, count: 2 }] },
+    blockAt: (position) => {
+      if (position.equals(target)) return state === 'air'
+        ? { name: 'air', boundingBox: 'empty', position }
+        : { name: 'spruce_slab', boundingBox: 'block', diggable: true, position, getProperties: () => ({ type: state }) }
+      return { name: 'stone', boundingBox: 'block', position }
+    },
+    equip: async () => {},
+    _placeBlockWithOptions: async () => {
+      placements += 1
+      state = placements === 1 ? 'double' : 'bottom'
+    }
+  }
+  await executor.place({
+    type: 'place', block: 'spruce_slab', expectedBlock: 'spruce_slab', verifyState: true,
+    x: 0, y: 64, z: 0, properties: { type: 'bottom' }
+  }, new AbortController().signal)
+  assert.equal(placements, 2)
+  assert.equal(clears, 1)
+  assert.equal(state, 'bottom')
+})
+
 test('schematic placement accepts a delayed server acknowledgement', async () => {
   const target = new Vec3(0, 64, 0)
   let placed = false
@@ -815,6 +1004,31 @@ test('schematic obstruction removal accepts a delayed server acknowledgement', a
   ), true)
   assert.equal(removed, true)
   assert.equal(collected, true)
+})
+
+test('schematic obstruction removal retries a block that briefly snaps back', async () => {
+  const target = new Vec3(0, 64, 0)
+  let state = 'slab'
+  let digs = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.collectDropsNear = async () => 0
+  executor.bot = {
+    blockAt: (position) => state === 'air'
+      ? { name: 'air', boundingBox: 'empty', position }
+      : { name: 'spruce_slab', boundingBox: 'block', position, diggable: true },
+    tool: { equipForBlock: async () => {} },
+    dig: async () => {
+      digs += 1
+      state = 'air'
+      if (digs === 1) setTimeout(() => { state = 'slab' }, 100)
+    },
+    stopDigging: () => {}
+  }
+  assert.equal(await executor.clearBuildObstruction(
+    target, new AbortController().signal, true
+  ), true)
+  assert.equal(digs, 2)
+  assert.equal(state, 'air')
 })
 
 test('schematic placement steps out of its own target cell', async () => {

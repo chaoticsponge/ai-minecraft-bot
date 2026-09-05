@@ -91,9 +91,19 @@ class BlueprintTask {
     // tear out correct blocks and can never converge on a large schematic.
     const strictProperties = new Set(['facing', 'axis', 'half'])
     if (expectedBlock?.endsWith('_slab')) strictProperties.add('type')
+    if (/(?:_door|_trapdoor|_fence_gate)$/.test(expectedBlock)) strictProperties.add('open')
+    if (['lantern', 'soul_lantern'].includes(expectedBlock)) strictProperties.add('hanging')
+    if (expectedBlock?.endsWith('_candle')) strictProperties.add('candles')
+    if (expectedBlock === 'sea_pickle') strictProperties.add('pickles')
+    if (expectedBlock === 'turtle_egg') strictProperties.add('eggs')
+    if (['pink_petals', 'wildflowers'].includes(expectedBlock)) strictProperties.add('flower_amount')
     return Object.entries(entry.properties || {})
       .filter(([name]) => strictProperties.has(name))
       .every(([name, value]) => String(actual[name]) === String(value))
+  }
+
+  entryItemCount(entry) {
+    return this.loader.itemCount?.(entry) || 1
   }
 
   structureLandmarkName(schematic) {
@@ -120,7 +130,7 @@ class BlueprintTask {
     let alreadyPlaced = 0
     for (const entry of blocks) {
       if (this.matchesEntry(this.bot.blockAt(entry.position), entry)) alreadyPlaced += 1
-      else remaining[entry.material] = (remaining[entry.material] || 0) + 1
+      else remaining[entry.material] = (remaining[entry.material] || 0) + this.entryItemCount(entry)
     }
     return { blocks, remaining, alreadyPlaced }
   }
@@ -190,8 +200,9 @@ class BlueprintTask {
     return 0
   }
 
-  async ensureBuildSupply(material, remaining, signal, optional = false) {
-    if (this.acquire.count(material) > 0) return this.acquire.count(material)
+  async ensureBuildSupply(material, remaining, signal, optional = false, neededNow = 1) {
+    const carried = this.acquire.count(material)
+    if (carried >= neededNow) return carried
     await this.executor.inventoryPolicy?.freeTrashSlots?.(1)
     if ((this.executor.inventoryTracker?.freeSlots?.() ?? 1) < 1) {
       const reserved = this.executor.inventoryPolicy?.reservedItems?.() || new Map()
@@ -199,12 +210,15 @@ class BlueprintTask {
         preserveItems: new Set([material, ...reserved.keys()]), minimumFreeSlots: 1
       })
     }
-    const quantity = this.buildSupplyBatch(material, remaining)
+    const quantity = Math.max(neededNow - carried, this.buildSupplyBatch(material, remaining))
     await this.executor.tryWithdrawFromNearby(material, quantity, signal)
     const available = this.acquire.count(material)
-    if (available <= 0 && optional) return 0
-    if (available <= 0) {
-      throw new Error(`missing build supply ${material}; put some in a nearby chest or barrel`)
+    if (available < neededNow && optional) return 0
+    if (available < neededNow) {
+      throw new Error(
+        `missing build supply ${material}; need ${neededNow} together for this block, ` +
+        `put some in a nearby chest or barrel`
+      )
     }
     return available
   }
@@ -243,6 +257,20 @@ class BlueprintTask {
       )
     }
     return true
+  }
+
+  async clearBuildPosition(position, signal, reclaimMaterial = false) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const current = this.bot.blockAt(position)
+      if (!current || current.boundingBox === 'empty') return true
+      await this.executor.clearBuildObstruction(position, signal, reclaimMaterial)
+      const after = this.bot.blockAt(position)
+      if (!after || after.boundingBox === 'empty') return true
+      if (attempt === 0) {
+        console.warn(`Build target ${position} restored ${after.name} after cleanup; clearing it once more`)
+      }
+    }
+    return false
   }
 
   canRaiseAboveGround(blocks, baseY) {
@@ -524,7 +552,8 @@ class BlueprintTask {
         const current = this.bot.blockAt(position)
         if (this.matchesEntry(current, entry) && !scaffolds.has(position.toString())) {
           task.detail.placed += 1
-          remaining[entry.material] = Math.max(0, (remaining[entry.material] || 1) - 1)
+          remaining[entry.material] = Math.max(0,
+            (remaining[entry.material] || this.entryItemCount(entry)) - this.entryItemCount(entry))
           continue
         }
         if (phase === 2 && unavailableOptional.has(entry.material)) {
@@ -534,7 +563,7 @@ class BlueprintTask {
         if (current && current.boundingBox !== 'empty') {
           const wasTemporaryScaffold = scaffolds.delete(position.toString())
           const reclaimed = wasTemporaryScaffold || requiredNames.has(current.name)
-          await this.executor.clearBuildObstruction(position, signal, reclaimed)
+          await this.clearBuildPosition(position, signal, reclaimed)
         }
         const cleared = this.bot.blockAt(position)
         if (!cleared || cleared.boundingBox !== 'empty') {
@@ -545,7 +574,8 @@ class BlueprintTask {
           throw new Error(`build site is obstructed by ${current?.name || 'unloaded terrain'} at ${position}`)
         }
         const available = await this.ensureBuildSupply(
-          entry.material, remaining[entry.material] || 1, signal, phase === 2
+          entry.material, remaining[entry.material] || 1, signal, phase === 2,
+          this.entryItemCount(entry)
         )
         if (available <= 0) {
           unavailableOptional.add(entry.material)
@@ -573,7 +603,8 @@ class BlueprintTask {
           ...(entry.properties ? { properties: entry.properties } : {})
         }, signal)
         task.detail.placed += 1
-        remaining[entry.material] = Math.max(0, (remaining[entry.material] || 1) - 1)
+        remaining[entry.material] = Math.max(0,
+          (remaining[entry.material] || this.entryItemCount(entry)) - this.entryItemCount(entry))
         if (task.detail.placed % 8 === 0 || task.detail.placed === task.detail.total) onProgress?.(task)
       }
       const skippedCount = Object.values(skippedOptional).reduce((total, count) => total + count, 0)
