@@ -30,6 +30,7 @@ let memoryRestarting = false
 let shuttingDown = false
 let reconnectAttempt = 0
 let lastHealthLogAt = 0
+let lastHealthSignature = null
 
 function formatError(value) {
   if (value instanceof AggregateError) return value.errors.map((error) => error.message).join('; ')
@@ -42,6 +43,7 @@ function connect() {
   clearTimeout(reconnectTimer)
   clearInterval(memoryTimer)
   memoryRestarting = false
+  lastHealthSignature = null
   const options = config.minecraft
   console.log(
     `Connecting to ${options.host}:${options.port} as ${options.username} ` +
@@ -97,11 +99,16 @@ function connect() {
           : bot.pathfinder?.isMoving?.()
             ? 'moving'
             : 'still'
-      if (Date.now() - lastHealthLogAt >= 60000) {
+      const phase = controller?.active?.phase || 'idle'
+      const healthSignature = `${phase}|${action}|${coordinates}|${pathState}`
+      const unchangedIdle = phase === 'idle' && healthSignature === lastHealthSignature
+      const healthLogInterval = unchangedIdle ? 300000 : 60000
+      if (Date.now() - lastHealthLogAt >= healthLogInterval) {
         lastHealthLogAt = Date.now()
+        lastHealthSignature = healthSignature
         console.log(
           `Runtime health: heap ${heapMb}MB, RSS ${rssMb}MB, ` +
-          `phase ${controller?.active?.phase || 'idle'}, action ${action}, at ${coordinates}, path ${pathState}`
+          `phase ${phase}, action ${action}, at ${coordinates}, path ${pathState}`
         )
       }
       if (!memoryRestarting && (heapMb >= config.limits.memoryRestartMb || rssMb >= config.limits.memoryRestartMb)) {

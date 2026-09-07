@@ -35,6 +35,12 @@ class BlockTracker {
     return true
   }
 
+  clearUnreachable(position = null) {
+    if (position) return this.unreachable.delete(position.toString())
+    this.unreachable.clear()
+    return true
+  }
+
   find(typeIds, maxDistance, count = 512) {
     const origin = this.bot.entity.position
     const now = Date.now()

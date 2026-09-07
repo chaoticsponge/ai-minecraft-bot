@@ -35,6 +35,11 @@ function suffocatingBlock(bot) {
   const block = bot.blockAt(headPosition)
   if (!block || block.boundingBox === 'empty') return null
   if (['water', 'lava', 'bubble_column'].includes(block.name)) return null
+  // Mineflayer labels many partial collision blocks (open trapdoors, doors,
+  // panes, fences) with boundingBox="block". Minecraft does not apply
+  // in-wall suffocation for these transparent shapes, so digging them as an
+  // emergency response damages a valid build and creates an interrupt loop.
+  if (block.transparent === true) return null
   return block
 }
 

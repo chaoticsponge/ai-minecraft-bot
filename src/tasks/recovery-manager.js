@@ -148,7 +148,13 @@ class RecoveryManager {
         lastProgressAt = Date.now()
         return
       }
-      const timeout = active ? this.stallMs : this.stallMs * 2
+      // Large schematic path searches legitimately run near the configured
+      // pathfinder think timeout and can spend several seconds bridging or
+      // awaiting a placement acknowledgement without changing position. The
+      // generic active timeout was shorter than that search, causing false
+      // recoveries and expensive full blueprint re-audits.
+      const buildMultiplier = ['build_schematic', 'repair_schematic'].includes(action.type) ? 2 : 1
+      const timeout = (active ? this.stallMs : this.stallMs * 2) * buildMultiplier
       if (!state.stalled && !ignoresInactivity && Date.now() - lastProgressAt >= timeout) {
         state.stalled = true
         const leaf = task.activeLeaf?.()

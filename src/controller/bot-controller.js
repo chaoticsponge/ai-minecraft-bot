@@ -74,6 +74,19 @@ function isResumeRequest(message) {
   return /^(?:continue|resume|carry on|keep going)[?.!]*$/i.test(message.trim())
 }
 
+function isBuildSupplyAcknowledgement(message, material) {
+  if (!material) return false
+  const text = message.trim().toLowerCase().replace(/[?.!]+$/g, '')
+  if (text.length > 120) return false
+  const readableMaterial = material.replaceAll('_', ' ')
+  const mentionsSupply = text.includes(readableMaterial) ||
+    /\b(?:it|them|supplies|materials?|blocks?)\b/.test(text)
+  const reportsArrival = /\b(?:add(?:ed)?|put|placed?|left|stock(?:ed)?|suppl(?:y|ied)|ready|done|for you)\b/.test(text) ||
+    /\b(?:in|inside) (?:the )?(?:chest|barrel|storage)\b/.test(text) ||
+    /\bit'?s in\b/.test(text)
+  return mentionsSupply && reportsArrival
+}
+
 function abortableDelay(ms, signal) {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
@@ -126,7 +139,22 @@ function missingEquipmentForFailure(failure) {
 function missingBuildMaterialForFailure(failure) {
   if (failure?.category !== 'missing_resource' ||
       !['build_schematic', 'repair_schematic'].includes(failure.action?.type)) return null
-  return String(failure.error || '').toLowerCase().match(/missing build supply ([a-z0-9_]+)/)?.[1] || null
+  const message = String(failure.error || '').toLowerCase()
+  if (/no dirt or stone blocks|cannot support floating build block/.test(message)) return 'build_scaffold'
+  return message.match(/missing build supply ([a-z0-9_]+)/)?.[1] || null
+}
+
+function buildMaterialLabel(material) {
+  if (material === 'build_scaffold') {
+    return 'scaffold blocks (dirt, cobblestone, stone, tuff, andesite, diorite, granite, calcite, or sandstone)'
+  }
+  return material.replaceAll('_', ' ')
+}
+
+function missingBuildQuantityForFailure(failure) {
+  if (!failure?.error) return null
+  const match = String(failure.error).toLowerCase().match(/need ([0-9]+) remaining for this build/)
+  return match ? Number(match[1]) : null
 }
 
 function equipmentLabel(equipment) {
@@ -448,6 +476,12 @@ class BotController {
     }
     if (isProgressQuestion(request)) {
       this.whisper(username, this.progressMessage())
+      return
+    }
+    if (this.active?.waitingForResource &&
+        isBuildSupplyAcknowledgement(request, this.active.waitingForResource)) {
+      this.whisper(username, 'Thanks — checking the nearby storage now.')
+      this.executor.notifyBuildSupplyChanged()
       return
     }
     if (request === 'stop') {
@@ -783,6 +817,10 @@ class BotController {
           if (failed) {
             const material = missingBuildMaterialForFailure(failed)
             if (material) {
+              const quantity = missingBuildQuantityForFailure(failed)
+              const requestedSupply = quantity && material !== 'build_scaffold'
+                ? `${quantity} ${buildMaterialLabel(material)}`
+                : buildMaterialLabel(material)
               const requestKey = `${failed.action?.type || 'build'}:${material}`
               if (!state.requestedResources.has(requestKey)) {
                 state.requestedResources.add(requestKey)
@@ -791,14 +829,14 @@ class BotController {
                 const position = this.bot.entity.position.floored()
                 this.whisper(
                   requester,
-                  `I'm stuck and need ${material.replaceAll('_', ' ')} for the build. Put it in a nearby chest or barrel; I'll keep checking. I'm at ${position.x}, ${position.y}, ${position.z}.`
+                  `I'm stuck and need ${requestedSupply} for the build. Put some in a nearby chest or barrel; I'll keep checking. I'm at ${position.x}, ${position.y}, ${position.z}.`
                 )
                 resumePlan = checkpointPlan
                 resumeIndex = Number.isInteger(state.actionIndex) ? state.actionIndex : startIndex
                 let received = false
                 try {
                   received = await this.executor.waitForBuildSupply(
-                    material, skillAbort.signal, this.config.limits.equipmentRequestWaitMs
+                    material, skillAbort.signal, null
                   )
                 } finally {
                   state.waitingForResource = null
@@ -806,11 +844,11 @@ class BotController {
                 if (received) {
                   state.requestedResources.delete(requestKey)
                   if (failed.action) state.failedActions.delete(actionFingerprint(failed.action))
-                  this.whisper(requester, `Thanks — I found the ${material.replaceAll('_', ' ')}. Resuming now.`)
+                  this.whisper(requester, `Thanks — I found ${buildMaterialLabel(material)}. Resuming now.`)
                   trigger = { type: 'build_supply_received', material }
                   continue
                 }
-                this.whisper(requester, `I still need ${material.replaceAll('_', ' ')}; the build remains checkpointed.`)
+                this.whisper(requester, `I still need ${buildMaterialLabel(material)}; the build remains checkpointed.`)
                 return
               }
             }
@@ -851,6 +889,16 @@ class BotController {
               resumePlan = null
               resumeIndex = 0
               this.whisper(requester, `I still need a ${equipmentLabel(equipment)}; the task remains checkpointed.`)
+            }
+            if (failed.category === 'build_access' &&
+                ['build_schematic', 'repair_schematic'].includes(failed.action?.type)) {
+              state.phase = 'blocked_build_access'
+              this.whisperLong(
+                requester,
+                `I placed everything I can reach, but ${failed.error}. ` +
+                `The build is checkpointed—clear or open access around those spots, then tell me "resume".`
+              )
+              return
             }
             trigger = failed
             continue
@@ -936,5 +984,7 @@ module.exports = {
   worldProgressFingerprint,
   applyTaskProgressResume,
   missingEquipmentForFailure,
-  missingBuildMaterialForFailure
+  missingBuildMaterialForFailure,
+  missingBuildQuantityForFailure,
+  isBuildSupplyAcknowledgement
 }

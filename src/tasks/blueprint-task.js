@@ -24,6 +24,20 @@ const OPTIONAL_PLANTS = new Set([
   'sea_pickle', 'sunflower', 'wildflowers', 'wither_rose'
 ])
 
+function isDeferrableBuildNavigation(error) {
+  return /no player-reachable placement stance|no path to the goal|placement-aware approach.*failed/i
+    .test(String(error?.message || error))
+}
+
+function nearDeferredBuildPocket(position, phase, pockets) {
+  return pockets.some((entry) => entry.phase === phase &&
+    Math.abs(entry.position.y - position.y) <= 1 &&
+    Math.max(
+      Math.abs(entry.position.x - position.x),
+      Math.abs(entry.position.z - position.z)
+    ) <= 2)
+}
+
 class BlueprintTask {
   constructor(bot, executor, loader) {
     this.bot = bot
@@ -287,7 +301,7 @@ class BlueprintTask {
     if (available < neededNow && optional) return 0
     if (available < neededNow) {
       throw new Error(
-        `missing build supply ${material}; need ${neededNow} together for this block, ` +
+        `missing build supply ${material}; need ${Math.max(neededNow, remaining)} remaining for this build, ` +
         `put some in a nearby chest or barrel`
       )
     }
@@ -577,6 +591,8 @@ class BlueprintTask {
     this.rememberStructure(action)
     const { blocks, remaining, alreadyPlaced } = this.audit(action, blueprint)
     const pending = this.pendingPlacements(blocks)
+    const deferredPlacements = new Map()
+    const deferredPockets = []
     const buildApproach = await this.walkToBuildSite(action, blueprint, signal, alreadyPlaced > 0)
     const task = rootTask.child('build', `build ${action.schematic}`, { placed: alreadyPlaced, total: blocks.length })
     task.start()
@@ -586,6 +602,7 @@ class BlueprintTask {
     ))
     const unavailableOptional = new Set()
     const skippedOptional = {}
+    const unreachableRequired = []
     let activePhase = -1
     const scaffolds = new Map()
     const expectedAt = new Map(blocks.map((entry) => [entry.position.toString(), entry]))
@@ -647,6 +664,36 @@ class BlueprintTask {
           skippedOptional[entry.material] = (skippedOptional[entry.material] || 0) + 1
           continue
         }
+        const deferredKey = position.toString()
+        if (!deferredPlacements.has(deferredKey) &&
+            nearDeferredBuildPocket(position, phase, deferredPockets)) {
+          deferredPlacements.set(deferredKey, 1)
+          pending.push(entry)
+          console.warn(
+            `Deferred nearby ${entry.block || entry.material} at ${position} with an inaccessible build pocket`
+          )
+          continue
+        }
+        // Verify supplies before walking to and dismantling a scaffold at the
+        // destination. The exception is a block of the required material in
+        // the wrong state (for example, a bottom slab where a top slab is
+        // required): reclaiming it can provide the item needed for replacement.
+        const currentCanSupply = current && current.boundingBox !== 'empty' && (
+          current.name === entry.material || current.name === entry.block ||
+          (entry.material === 'any_planks' && current.name.endsWith('_planks'))
+        )
+        let available = null
+        if (!currentCanSupply) {
+          available = await this.ensureBuildSupply(
+            entry.material, remaining[entry.material] || 1, signal, phase === 2,
+            this.entryItemCount(entry)
+          )
+          if (available <= 0) {
+            unavailableOptional.add(entry.material)
+            skippedOptional[entry.material] = (skippedOptional[entry.material] || 0) + 1
+            continue
+          }
+        }
         // A door or bed cannot have one half placed independently. Clear its
         // generated partner first, then place the owner half once so Minecraft
         // recreates the complete object with consistent state.
@@ -670,7 +717,7 @@ class BlueprintTask {
           }
           throw new Error(`build site is obstructed by ${current?.name || 'unloaded terrain'} at ${position}`)
         }
-        const available = await this.ensureBuildSupply(
+        available ??= await this.ensureBuildSupply(
           entry.material, remaining[entry.material] || 1, signal, phase === 2,
           this.entryItemCount(entry)
         )
@@ -687,22 +734,75 @@ class BlueprintTask {
         if (entry.y === 0 && (!below || below.boundingBox === 'empty')) {
           await this.executor.repairStairFloor(position.offset(0, -1, 0), signal)
         }
-        await this.executor.place({
-          type: 'place', block: blockName, x: position.x, y: position.y, z: position.z,
-          expectedBlock: entry.block || blockName,
-          verifyState: true,
-          trackTemporaryScaffold: (scaffoldPosition) => {
-            scaffolds.set(scaffoldPosition.toString(), scaffoldPosition.clone())
-          },
-          untrackTemporaryScaffold: (scaffoldPosition) => {
-            scaffolds.delete(scaffoldPosition.toString())
-          },
-          ...(entry.properties ? { properties: entry.properties } : {})
-        }, signal)
+        try {
+          await this.executor.place({
+            type: 'place', block: blockName, x: position.x, y: position.y, z: position.z,
+            expectedBlock: entry.block || blockName,
+            verifyState: true,
+            buildBounds: {
+              minX: Math.min(...xs), maxX: Math.max(...xs),
+              minZ: Math.min(...zs), maxZ: Math.max(...zs),
+              baseY: Math.floor(action.y), topY
+            },
+            trackTemporaryScaffold: (scaffoldPosition) => {
+              scaffolds.set(scaffoldPosition.toString(), scaffoldPosition.clone())
+            },
+            untrackTemporaryScaffold: (scaffoldPosition) => {
+              scaffolds.delete(scaffoldPosition.toString())
+            },
+            ...(entry.properties ? { properties: entry.properties } : {})
+          }, signal)
+        } catch (error) {
+          const key = position.toString()
+          const attempts = deferredPlacements.get(key) || 0
+          if (isDeferrableBuildNavigation(error) && attempts < 2) {
+            deferredPlacements.set(key, attempts + 1)
+            if (attempts === 0) deferredPockets.push({ position: position.clone(), phase })
+            pending.push(entry)
+            console.warn(
+              `Deferred ${entry.block || blockName} at ${position} after inaccessible placement; ` +
+              `will retry after other build work`
+            )
+            continue
+          }
+          if (isDeferrableBuildNavigation(error)) {
+            if (phase === 2) {
+              skippedOptional[entry.material] = (skippedOptional[entry.material] || 0) + 1
+              console.warn(`Skipped inaccessible optional ${entry.block || blockName} at ${position}`)
+            } else {
+              unreachableRequired.push({
+                block: entry.block || blockName,
+                position: position.clone()
+              })
+              console.warn(
+                `Could not reach required ${entry.block || blockName} at ${position}; ` +
+                `continuing with the rest of the build`
+              )
+            }
+            continue
+          }
+          throw error
+        }
         task.detail.placed += entry.progressCredit || 1
         remaining[entry.material] = Math.max(0,
           (remaining[entry.material] || this.entryItemCount(entry)) - this.entryItemCount(entry))
         if (task.detail.placed % 8 === 0 || task.detail.placed === task.detail.total) onProgress?.(task)
+      }
+      if (unreachableRequired.length) {
+        task.detail.unreachable = unreachableRequired.map(({ block, position }) => ({
+          block, x: position.x, y: position.y, z: position.z
+        }))
+        onProgress?.(task)
+        const examples = unreachableRequired.slice(0, 5)
+          .map(({ block, position }) => `${block} at ${position}`)
+          .join(', ')
+        const error = new Error(
+          `build access blocked for ${unreachableRequired.length} required placement` +
+          `${unreachableRequired.length === 1 ? '' : 's'} after completing all reachable work; ${examples}` +
+          `${unreachableRequired.length > 5 ? `, and ${unreachableRequired.length - 5} more` : ''}`
+        )
+        error.category = 'build_access'
+        throw error
       }
       const skippedCount = Object.values(skippedOptional).reduce((total, count) => total + count, 0)
       task.detail.skippedOptional = skippedOptional
@@ -734,8 +834,9 @@ class BlueprintTask {
           console.warn(`Could not recover all build scaffolding: ${error.message}`)
         }
       }
+      if (buildCompleted) this.executor.landmarks?.forget('active_build_access')
     }
   }
 }
 
-module.exports = { BlueprintTask }
+module.exports = { BlueprintTask, isDeferrableBuildNavigation, nearDeferredBuildPocket }

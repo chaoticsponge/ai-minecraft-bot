@@ -23,7 +23,9 @@ const { ActionExecutor } = require('../src/controller/action-executor')
 const { EventMonitor, nearestThreat, suffocatingBlock } = require('../src/controller/event-monitor')
 const { installToolCompatibility, safeEnchantments } = require('../src/controller/tool-compatibility')
 const { LandmarkStore } = require('../src/controller/landmark-store')
-const { BlueprintTask } = require('../src/tasks/blueprint-task')
+const {
+  BlueprintTask, isDeferrableBuildNavigation, nearDeferredBuildPocket
+} = require('../src/tasks/blueprint-task')
 const { BotController } = require('../src/controller/bot-controller')
 const { itemForBlock } = require('../scripts/convert-schem')
 
@@ -960,6 +962,7 @@ test('schematic placement toggles blocks to their requested open state', async (
   let placed = false
   let open = false
   let activations = 0
+  let usedFace = null
   const executor = Object.create(ActionExecutor.prototype)
   executor.limits = { maxMoveDistance: 64 }
   executor.assertNearby = () => {}
@@ -975,7 +978,7 @@ test('schematic placement toggles blocks to their requested open state', async (
     equip: async () => {},
     lookAt: async () => {},
     activateBlock: async () => { activations += 1; open = true },
-    _placeBlockWithOptions: async () => { placed = true }
+    _placeBlockWithOptions: async (_reference, face) => { usedFace = face; placed = true }
   }
   await executor.place({
     type: 'place', block: 'spruce_trapdoor', expectedBlock: 'spruce_trapdoor', verifyState: true,
@@ -983,6 +986,7 @@ test('schematic placement toggles blocks to their requested open state', async (
   }, new AbortController().signal)
   assert.equal(activations, 1)
   assert.equal(open, true)
+  assert.deepEqual(usedFace, new Vec3(0, 0, -1))
 })
 
 test('schematic placement stacks candles to the requested count', async () => {
@@ -1445,6 +1449,196 @@ test('building creates a tracked temporary staircase to a sealed upper placement
   assert.deepEqual(tracked, ['(1, 64, 0)', '(2, 65, 0)', '(3, 66, 0)'])
 })
 
+test('building can scaffold from ground level to an upper schematic floor', async () => {
+  const start = new Vec3(0, 64, 0)
+  const stance = new Vec3(10, 72, 0)
+  const solid = new Set()
+  const tracked = []
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    entity: { position: start.clone() },
+    blockAt: (position) => ({
+      name: solid.has(position.toString()) ? 'cobbled_deepslate' : 'air',
+      boundingBox: solid.has(position.toString()) ? 'block' : 'empty',
+      position
+    })
+  }
+  executor.isPassable = (block) => block.boundingBox === 'empty'
+  executor.isLiquid = () => false
+  executor.createPlacementSupport = async (position) => {
+    solid.add(position.toString())
+    return [position.clone()]
+  }
+  executor.gotoBounded = async (goal) => {
+    executor.bot.entity.position = new Vec3(goal.x, goal.y, goal.z)
+  }
+  const climbed = await executor.createPlacementStaircase(
+    stance, new AbortController().signal, 'dark_oak_slab',
+    (position) => tracked.push(position.toString())
+  )
+  assert.equal(climbed, true)
+  assert.equal(tracked.length, 10)
+  assert.equal(tracked.at(-1), '(10, 71, 0)')
+})
+
+test('successful tall build stairs are persisted for later storage returns', async () => {
+  const start = new Vec3(0, 64, 0)
+  const stance = new Vec3(6, 70, 0)
+  const solid = new Set()
+  let remembered = null
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    game: { dimension: 'overworld' }, entity: { position: start.clone() },
+    blockAt: (position) => ({
+      name: solid.has(position.toString()) ? 'cobblestone' : 'air',
+      boundingBox: solid.has(position.toString()) ? 'block' : 'empty', position
+    })
+  }
+  executor.landmarks = { remember: (...args) => { remembered = args } }
+  executor.isPassable = (block) => block.boundingBox === 'empty'
+  executor.isLiquid = () => false
+  executor.createPlacementSupport = async (position) => {
+    solid.add(position.toString())
+    return [position.clone()]
+  }
+  executor.gotoBounded = async (goal) => { executor.bot.entity.position = new Vec3(goal.x, goal.y, goal.z) }
+  assert.equal(await executor.createPlacementStaircase(
+    stance, new AbortController().signal, 'stone', () => {}
+  ), true)
+  assert.equal(remembered[0], 'active_build_access')
+  assert.equal(remembered[3], 'build_access')
+  assert.equal(remembered[4].route.length, 7)
+})
+
+test('storage return can replay a saved build staircase before returning to work', async () => {
+  const visited = []
+  const movements = { maxDropDown: 4 }
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    game: { dimension: 'overworld' }, entity: { position: new Vec3(0, 64, 0) },
+    pathfinder: { movements }
+  }
+  executor.landmarks = { get: () => ({
+    type: 'build_access', dimension: 'overworld',
+    route: [{ x: 2, y: 64, z: 0 }, { x: 3, y: 65, z: 0 }, { x: 4, y: 66, z: 0 }]
+  }) }
+  executor.gotoPositionSegmented = async (point) => {
+    visited.push(`segment:${point}`)
+    executor.bot.entity.position = point.clone()
+  }
+  executor.gotoBounded = async (goal) => {
+    assert.equal(movements.maxDropDown, 1)
+    const point = new Vec3(goal.x, goal.y, goal.z)
+    visited.push(`step:${point}`)
+    executor.bot.entity.position = point
+  }
+  const work = new Vec3(5, 66, 0)
+  assert.equal(await executor.returnViaBuildAccess(work, new AbortController().signal), true)
+  assert.deepEqual(visited, [
+    'segment:(2, 64, 0)', 'step:(3, 65, 0)', 'step:(4, 66, 0)', 'segment:(5, 66, 0)'
+  ])
+  assert.equal(movements.maxDropDown, 4)
+})
+
+test('building bridges from an interior upper landing without dropping to ground', async () => {
+  const start = new Vec3(0, 70, 0)
+  const stance = new Vec3(5, 69, 0)
+  const solid = new Set()
+  const tracked = []
+  const movements = { maxDropDown: 4 }
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    entity: { position: start.clone() }, pathfinder: { movements },
+    blockAt: (position) => ({
+      name: solid.has(position.toString()) ? 'cobblestone' : 'air',
+      boundingBox: solid.has(position.toString()) ? 'block' : 'empty',
+      position
+    })
+  }
+  executor.isPassable = (block) => block.boundingBox === 'empty'
+  executor.isLiquid = () => false
+  executor.createPlacementSupport = async (position) => {
+    solid.add(position.toString())
+    return [position.clone()]
+  }
+  executor.gotoBounded = async (goal) => {
+    assert.equal(movements.maxDropDown, 1)
+    executor.bot.entity.position = new Vec3(goal.x, goal.y, goal.z)
+  }
+  const crossed = await executor.createPlacementWalkway(
+    stance, new AbortController().signal, 'dark_oak_slab',
+    (position) => tracked.push(position.toString())
+  )
+  assert.equal(crossed, true)
+  assert.equal(executor.bot.entity.position.toString(), stance.toString())
+  assert.equal(movements.maxDropDown, 4)
+  assert.equal(tracked.length, 5)
+})
+
+test('building stages an upper-floor scaffold ramp from outside the footprint', async () => {
+  const start = new Vec3(2, 64, 2)
+  const stance = new Vec3(3, 70, 3)
+  const solid = new Set()
+  const approaches = []
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    entity: { position: start.clone() },
+    blockAt: (position) => ({
+      name: position.y === 63 || solid.has(position.toString()) ? 'stone' : 'air',
+      boundingBox: position.y === 63 || solid.has(position.toString()) ? 'block' : 'empty',
+      position
+    })
+  }
+  executor.isPassable = (block) => block.boundingBox === 'empty'
+  executor.isLiquid = () => false
+  executor.createPlacementSupport = async (position) => {
+    solid.add(position.toString())
+    return [position.clone()]
+  }
+  executor.gotoBounded = async (goal) => {
+    approaches.push(new Vec3(goal.x, goal.y, goal.z))
+    executor.bot.entity.position = new Vec3(goal.x, goal.y, goal.z)
+  }
+  const climbed = await executor.createExteriorPlacementStaircase(
+    stance, { minX: 0, maxX: 4, minZ: 0, maxZ: 4, baseY: 63, topY: 80 },
+    new AbortController().signal, 'dark_oak_slab'
+  )
+  assert.equal(climbed, true)
+  assert.equal(
+    approaches.some((position) => position.x === -1 || position.x === 5 || position.z === -1 || position.z === 5),
+    true
+  )
+  assert.equal(executor.bot.entity.position.toString(), stance.toString())
+})
+
+test('building discovers completed upper landings away from the target', () => {
+  const standable = new Set(['(1, 68, 1)', '(6, 69, 6)', '(5, 64, 5)'])
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = { entity: { position: new Vec3(1, 64, 1) } }
+  executor.canStandAt = (position) => standable.has(position.toString())
+  const target = new Vec3(9, 70, 9)
+  const staging = executor.interiorBuildStagingPositions(target, {
+    minX: 0, maxX: 10, minZ: 0, maxZ: 10, baseY: 63, topY: 80
+  })
+  assert.deepEqual(staging.map(String), ['(6, 69, 6)', '(1, 68, 1)'])
+})
+
+test('building defers inaccessible placements but not missing materials', () => {
+  assert.equal(isDeferrableBuildNavigation(
+    new Error('no player-reachable placement stance for spruce_trapdoor at (1, 2, 3)')
+  ), true)
+  assert.equal(isDeferrableBuildNavigation(new Error('No path to the goal!')), true)
+  assert.equal(isDeferrableBuildNavigation(new Error('missing build supply spruce_trapdoor')), false)
+})
+
+test('building groups nearby inaccessible details without crossing phases or floors', () => {
+  const pockets = [{ position: new Vec3(10, 64, 10), phase: 1 }]
+  assert.equal(nearDeferredBuildPocket(new Vec3(12, 65, 9), 1, pockets), true)
+  assert.equal(nearDeferredBuildPocket(new Vec3(12, 65, 9), 2, pockets), false)
+  assert.equal(nearDeferredBuildPocket(new Vec3(12, 67, 9), 1, pockets), false)
+  assert.equal(nearDeferredBuildPocket(new Vec3(13, 64, 10), 1, pockets), false)
+})
+
 test('construction restocks scaffold blocks before placing floating blocks', async () => {
   const items = []
   const requested = []
@@ -1459,7 +1653,7 @@ test('construction restocks scaffold blocks before placing floating blocks', asy
   }
   const scaffold = await executor.ensurePlacementScaffold(new AbortController().signal, 'spruce_leaves')
   assert.equal(scaffold.name, 'cobbled_deepslate')
-  assert.deepEqual(requested, [{ name: 'cobbled_deepslate', quantity: 16 }])
+  assert.deepEqual(requested, [{ name: 'cobbled_deepslate', quantity: 64 }])
 })
 
 test('construction falls back to safe stone variants for scaffolding', () => {
@@ -1471,6 +1665,113 @@ test('construction falls back to safe stone variants for scaffolding', () => {
     ] }
   }
   assert.equal(executor.scaffoldItem().name, 'andesite')
+})
+
+test('build supply waiting accepts any supported scaffold material', async () => {
+  const items = []
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.activity = null
+  executor.bot = { inventory: { items: () => items } }
+  executor.ensurePlacementScaffold = async () => {
+    items.push({ name: 'tuff', count: 8 })
+    return items[0]
+  }
+  const found = await executor.waitForBuildSupply(
+    'build_scaffold', new AbortController().signal, 100
+  )
+  assert.equal(found, true)
+  assert.equal(executor.activity, null)
+})
+
+test('build supply waiting restocks a useful batch instead of one block', async () => {
+  const items = []
+  let request = null
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.activity = null
+  executor.bot = { inventory: { items: () => items } }
+  executor.inventoryCount = (name) => items
+    .filter((item) => item.name === name)
+    .reduce((total, item) => total + item.count, 0)
+  executor.tryWithdrawFromNearby = async (name, quantity) => {
+    request = { name, quantity }
+    items.push({ name, count: 32 })
+    return 32
+  }
+  assert.equal(await executor.waitForBuildSupply(
+    'mangrove_planks', new AbortController().signal, 100
+  ), true)
+  assert.deepEqual(request, { name: 'mangrove_planks', quantity: 64 })
+})
+
+test('persistent build supply waiting remains immediately interruptible', async () => {
+  const controller = new AbortController()
+  let checks = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.activity = null
+  executor.bot = { inventory: { items: () => [] } }
+  executor.inventoryCount = () => 0
+  executor.tryWithdrawFromNearby = async () => { checks += 1; return 0 }
+  const waiting = executor.waitForBuildSupply('packed_mud', controller.signal, null)
+  setTimeout(() => controller.abort(), 20)
+  await assert.rejects(waiting, { name: 'AbortError' })
+  assert.equal(checks, 1)
+  assert.equal(executor.activity, null)
+})
+
+test('persistent supply polling reopens previously inspected storage', async () => {
+  const items = []
+  let opened = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.activity = null
+  executor.limits = { pathSearchRadius: 32 }
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, 0) },
+    inventory: { items: () => items },
+    pathfinder: { movements: { allow1by1towers: true } }
+  }
+  executor.knownStoredChoice = () => null
+  executor.hasUninspectedLoadedStorage = () => false
+  executor.recordGoalWithdrawal = () => {}
+  executor.withRememberedContainer = async () => false
+  executor.withNearestContainer = async (_signal, operation) => {
+    opened += 1
+    return operation({
+      containerItems: () => [{ name: 'packed_mud', type: 7, count: 4 }],
+      withdraw: async () => { items.push({ name: 'packed_mud', type: 7, count: 4 }) }
+    })
+  }
+  assert.equal(await executor.tryWithdrawFromNearby(
+    'packed_mud', 64, new AbortController().signal, { forceInspect: true }
+  ), 4)
+  assert.equal(opened, 1)
+  assert.equal(executor.bot.pathfinder.movements.allow1by1towers, true)
+})
+
+test('persistent supply waiting returns to work only after finding the item', async () => {
+  const items = []
+  const work = new Vec3(10, 80, 10)
+  const storage = new Vec3(2, 64, 2)
+  let options = null
+  let returnedTo = null
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.activity = null
+  executor.bot = { entity: { position: work.clone() }, inventory: { items: () => items } }
+  executor.inventoryCount = (name) => items.filter((item) => item.name === name).length
+  executor.tryWithdrawFromNearby = async (name, _quantity, _signal, suppliedOptions) => {
+    options = suppliedOptions
+    executor.bot.entity.position = storage.clone()
+    items.push({ name, count: 4 })
+    return 4
+  }
+  executor.gotoPositionSegmented = async (position) => {
+    returnedTo = position.clone()
+    executor.bot.entity.position = position.clone()
+  }
+  assert.equal(await executor.waitForBuildSupply(
+    'packed_mud', new AbortController().signal, null
+  ), true)
+  assert.deepEqual(options, { forceInspect: true, stayAtStorageWhenEmpty: true })
+  assert.ok(returnedTo.equals(work))
 })
 
 test('vertical schematic logs refuse horizontal support and scaffold below', async () => {
@@ -1687,6 +1988,13 @@ test('classifies routine failures and retries safe navigation once', async () =>
   assert.equal(recoveries, 1)
 })
 
+test('classifies a build stack depleted during approach as a missing resource', () => {
+  assert.equal(
+    classifyFailure(new Error('missing build supply mangrove_planks; the carried stack was depleted while approaching (1, 2, 3)')),
+    'missing_resource'
+  )
+})
+
 test('schematic builds retry transient placement loss locally without AI replanning', async () => {
   const bot = {
     entity: { position: new Vec3(0, 64, 0) },
@@ -1871,6 +2179,19 @@ test('inventory and entity trackers maintain queryable local state', () => {
   assert.equal(entities.droppedItems('diamond', 8).length, 0)
   inventory.shutdown()
   entities.shutdown()
+})
+
+test('block tracker can clear stale unreachable cooldowns before an alternate route', () => {
+  class Bot extends EventEmitter {}
+  const bot = new Bot()
+  bot.entity = { position: new Vec3(0, 64, 0) }
+  const tracker = new BlockTracker(bot)
+  const position = new Vec3(4, 64, 0)
+  tracker.markUnreachable(position, 'walking route failed')
+  assert.equal(tracker.isUnreachable(position), true)
+  tracker.clearUnreachable(position)
+  assert.equal(tracker.isUnreachable(position), false)
+  tracker.shutdown()
 })
 
 test('inventory policy preserves the maintained table and best tools', () => {
@@ -2447,6 +2768,23 @@ test('automatic storage skips a full nearby chest and tries the next chest', asy
   assert.ok(cooledDown[0].equals(positions[0]))
 })
 
+test('container searches exclude both halves of an opened double chest', () => {
+  const left = new Vec3(3, 64, 4)
+  const right = new Vec3(4, 64, 4)
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    blockAt: (position) => ({
+      name: position.equals(right) ? 'chest' : 'air',
+      position,
+      boundingBox: position.equals(right) ? 'block' : 'empty'
+    })
+  }
+  const excluded = executor.excludeContainerFootprint(new Set(), {
+    name: 'chest', position: left
+  })
+  assert.deepEqual([...excluded].sort(), [left.toString(), right.toString()].sort())
+})
+
 test('remembered storage forgets missing chests and continues to a useful chest', async () => {
   const missing = { name: 'missing', type: 'container', x: 1, y: 64, z: 0 }
   const useful = { name: 'useful', type: 'container', x: 2, y: 64, z: 0 }
@@ -2790,6 +3128,18 @@ test('suffocation recovery repeatedly clears the block intersecting the bot head
   const result = await executor.escapeSuffocation(new AbortController().signal)
   assert.match(result, /clearing 1/)
   assert.equal(dug, 1)
+  assert.equal(suffocatingBlock(bot), null)
+})
+
+test('open or partial transparent build blocks do not trigger suffocation recovery', () => {
+  const position = new Vec3(0, 65, 0)
+  const bot = {
+    entity: { position: new Vec3(0.5, 64, 0.5) },
+    blockAt: () => ({
+      name: 'acacia_trapdoor', boundingBox: 'block', transparent: true,
+      position, getProperties: () => ({ open: true })
+    })
+  }
   assert.equal(suffocatingBlock(bot), null)
 })
 

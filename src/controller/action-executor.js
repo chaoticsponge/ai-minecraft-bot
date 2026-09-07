@@ -141,6 +141,8 @@ class ActionExecutor {
     this.lastTunnelTorch = null
     this.emergencyWaterPromise = null
     this.emergencyWaterPosition = null
+    this.buildSupplyWake = null
+    this.lastStorageScaffoldAttemptAt = 0
   }
 
   async maintainToolSet(signal) {
@@ -1709,7 +1711,10 @@ class ActionExecutor {
       })
     }
     for (const name of SCAFFOLD_RESTOCK_PRIORITY) {
-      await this.tryWithdrawFromNearby(name, 16, signal)
+      // Building access routes routinely consume more than sixteen supports.
+      // Prefer one full-stack restock so the bot does not revisit the same
+      // chest several times while climbing a roof or tall schematic floor.
+      await this.tryWithdrawFromNearby(name, 64, signal)
       scaffold = this.scaffoldItem()
       if (scaffold) {
         console.log(`Restocked ${scaffold.count} ${scaffold.name} for construction support`)
@@ -1767,7 +1772,14 @@ class ActionExecutor {
     const dx = stance.x - start.x
     const dz = stance.z - start.z
     const steps = Math.max(Math.abs(dx), Math.abs(dz))
-    if (rise < 1 || rise > 6 || steps < rise || steps > 10) return false
+    // Large schematics can leave the bot at ground level after a recovery
+    // while the next unfinished block is several floors up.  A six-block
+    // ascent limit made otherwise safe, gently-rising scaffold stairs appear
+    // unreachable and handed the deterministic build back to the LLM. Keep
+    // the 1:1 maximum slope, but permit a local staircase across the full
+    // placement-search radius.
+    if (rise < 1 || rise > 12 || steps < rise || steps > 16) return false
+    const route = [start.clone()]
     for (let index = 1; index <= steps; index += 1) {
       const feet = new Vec3(
         start.x + Math.round(dx * index / steps),
@@ -1793,8 +1805,136 @@ class ActionExecutor {
         return false
       }
       if (this.bot.entity.position.distanceTo(feet) > 0.9) return false
+      route.push(feet.clone())
     }
-    return this.bot.entity.position.distanceTo(stance) <= 0.9
+    const reached = this.bot.entity.position.distanceTo(stance) <= 0.9
+    if (reached && rise >= 3 && trackScaffold && this.landmarks) {
+      this.landmarks.remember(
+        'active_build_access', route[0], this.bot.game?.dimension, 'build_access',
+        { route: route.map(({ x, y, z }) => ({ x, y, z })) }
+      )
+      console.log(`Remembered reusable build staircase with ${route.length - 1} steps`)
+    }
+    return reached
+  }
+
+  async createPlacementWalkway(stance, signal, preserveItem = null, trackScaffold = null) {
+    const start = this.bot.entity.position.floored()
+    const dx = stance.x - start.x
+    const dy = stance.y - start.y
+    const dz = stance.z - start.z
+    const steps = Math.max(Math.abs(dx), Math.abs(dz))
+    if (steps < 1 || steps > 20 || Math.abs(dy) > 2) return false
+    const movements = this.bot.pathfinder?.movements
+    const previousDrop = movements?.maxDropDown
+    if (movements) movements.maxDropDown = 1
+    try {
+      for (let index = 1; index <= steps; index += 1) {
+        const feet = new Vec3(
+          start.x + Math.round(dx * index / steps),
+          start.y + Math.round(dy * index / steps),
+          start.z + Math.round(dz * index / steps)
+        )
+        const feetBlock = this.bot.blockAt(feet)
+        const headBlock = this.bot.blockAt(feet.offset(0, 1, 0))
+        if (!this.isPassable(feetBlock) || !this.isPassable(headBlock) ||
+            this.isLiquid(feetBlock) || this.isLiquid(headBlock)) return false
+        const floor = feet.offset(0, -1, 0)
+        const floorBlock = this.bot.blockAt(floor)
+        if (!floorBlock || this.isPassable(floorBlock)) {
+          const created = await this.createPlacementSupport(floor, signal, preserveItem)
+          for (const position of created) trackScaffold?.(position)
+        } else if (this.isLiquid(floorBlock)) {
+          return false
+        }
+        try {
+          await this.gotoBounded(new goals.GoalBlock(feet.x, feet.y, feet.z), signal, 10)
+        } catch (error) {
+          if (error.name === 'AbortError') throw error
+          return false
+        }
+        if (this.bot.entity.position.distanceTo(feet) > 0.9) return false
+      }
+      return this.bot.entity.position.distanceTo(stance) <= 0.9
+    } finally {
+      if (movements) movements.maxDropDown = previousDrop
+    }
+  }
+
+  async createExteriorPlacementStaircase(stance, bounds, signal, preserveItem = null, trackScaffold = null) {
+    if (!bounds || !Number.isFinite(bounds.baseY)) return false
+    const currentY = this.bot.entity.position.floored().y
+    // The cleared build pad may sit well below the surrounding natural
+    // terrain. Scan a useful vertical band instead of assuming the exterior
+    // has the same floor Y as the schematic anchor.
+    const groundLevels = [...new Set([
+      currentY, currentY - 1, currentY + 1,
+      ...Array.from({ length: 14 }, (_, index) => bounds.baseY + index - 1)
+    ])]
+    const rise = Math.max(1, stance.y - Math.min(...groundLevels))
+    const run = Math.min(12, rise + 2)
+    const bases = []
+    for (const offset of [run, -run, 0]) {
+      bases.push(
+        new Vec3(bounds.minX - 1, 0, stance.z + offset),
+        new Vec3(bounds.maxX + 1, 0, stance.z + offset),
+        new Vec3(stance.x + offset, 0, bounds.minZ - 1),
+        new Vec3(stance.x + offset, 0, bounds.maxZ + 1)
+      )
+    }
+    const unique = new Map()
+    for (const base of bases) {
+      for (const y of groundLevels) {
+        const candidate = new Vec3(base.x, y, base.z)
+        if (this.canStandAt(candidate)) unique.set(candidate.toString(), candidate)
+      }
+    }
+    const approaches = [...unique.values()].sort((a, b) =>
+      this.bot.entity.position.distanceTo(a) - this.bot.entity.position.distanceTo(b)
+    )
+    if (!approaches.length) {
+      console.warn(`No standable exterior staging surface around build footprint for upper placement at ${stance}`)
+      return false
+    }
+    let navigationFailures = 0
+    for (const base of approaches.slice(0, 16)) {
+      try {
+        await this.gotoBounded(new goals.GoalBlock(base.x, base.y, base.z), signal, 32)
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+        navigationFailures += 1
+        continue
+      }
+      if (await this.createPlacementStaircase(
+        stance, signal, preserveItem, trackScaffold
+      )) return true
+    }
+    if (navigationFailures) {
+      console.warn(`Could not reach ${navigationFailures}/${Math.min(16, approaches.length)} exterior staging surfaces for ${stance}`)
+    }
+    return false
+  }
+
+  interiorBuildStagingPositions(target, bounds, limit = 64) {
+    if (!bounds) return []
+    const current = this.bot.entity.position
+    const candidates = []
+    const minY = Math.max(bounds.baseY + 1, target.y - 5)
+    const maxY = Math.min(bounds.topY + 1, target.y + 1)
+    for (let y = minY; y <= maxY; y += 1) {
+      for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
+        for (let z = bounds.minZ; z <= bounds.maxZ; z += 1) {
+          const position = new Vec3(x, y, z)
+          if (position.distanceTo(target) <= 3 || !this.canStandAt(position)) continue
+          candidates.push(position)
+        }
+      }
+    }
+    return candidates.sort((a, b) =>
+      Math.abs(target.y - a.y) - Math.abs(target.y - b.y) ||
+      current.distanceTo(a) - current.distanceTo(b) ||
+      a.distanceTo(target) - b.distanceTo(target)
+    ).slice(0, limit)
   }
 
   async repairStairFloor(position, signal) {
@@ -2531,13 +2671,22 @@ class ActionExecutor {
     return withdrawn
   }
 
-  async tryWithdrawFromNearby(itemName, quantity, signal) {
+  async tryWithdrawFromNearby(
+    itemName, quantity, signal,
+    { forceInspect = false, stayAtStorageWhenEmpty = false } = {}
+  ) {
     if (quantity <= 0) return 0
     const initiallyKnown = this.knownStoredChoice([itemName])
     const inspectLocal = this.hasUninspectedLoadedStorage()
-    if (!initiallyKnown && !inspectLocal) return 0
+    if (!initiallyKnown && !inspectLocal && !forceInspect) return 0
     const workPosition = this.bot.entity.position.floored()
     const previousActivity = this.activity
+    const movements = this.bot.pathfinder?.movements
+    const previousTower = movements?.allow1by1towers
+    // Storage is infrastructure, not a placement target. Inheriting a build
+    // task's tower permission makes chest searches scatter scaffold columns
+    // around the site. Use existing doors, stairs, and saved access routes.
+    if (movements) movements.allow1by1towers = false
     this.activity = `restocking ${itemName} from storage`
     let withdrawn = 0
     const withdrawFrom = async (container) => {
@@ -2553,10 +2702,30 @@ class ActionExecutor {
       return { done: withdrawn >= quantity, progressed: withdrawn > before }
     }
     try {
+      let walkingStorageError = null
       try {
         await this.withNearestContainer(signal, withdrawFrom, this.limits.pathSearchRadius || 32, true)
       } catch (localError) {
         if (localError.name === 'AbortError') throw localError
+        walkingStorageError = localError
+      }
+      if (withdrawn < quantity && walkingStorageError && previousTower &&
+          Date.now() - (this.lastStorageScaffoldAttemptAt || 0) >= 60000) {
+        // A roof-level builder may be separated from ground storage by one or
+        // two unfinished walkway gaps. First try existing stairs above; only
+        // after that fails, permit the build task's tracked scaffold movement
+        // for one bounded attempt. The resulting access is retained/reused.
+        this.lastStorageScaffoldAttemptAt = Date.now()
+        this.blockTracker?.clearUnreachable?.()
+        if (movements) movements.allow1by1towers = true
+        try {
+          await this.withNearestContainer(signal, withdrawFrom, this.limits.pathSearchRadius || 32, true)
+          console.log(`Reached storage for ${itemName} using tracked build-access repairs`)
+        } catch (scaffoldError) {
+          if (scaffoldError.name === 'AbortError') throw scaffoldError
+        } finally {
+          if (movements) movements.allow1by1towers = false
+        }
       }
       const knownAfterInspection = this.knownStoredChoice([itemName])
       if (withdrawn < quantity && (initiallyKnown || knownAfterInspection)) {
@@ -2578,41 +2747,134 @@ class ActionExecutor {
       console.log(`Known storage did not supply ${itemName}: ${error.message}`)
     } finally {
       try {
-        if (!signal.aborted && this.bot.entity.position.distanceTo(workPosition) > 2) {
+        if (!signal.aborted && (!stayAtStorageWhenEmpty || withdrawn > 0) &&
+            this.bot.entity.position.distanceTo(workPosition) > 2) {
           try { await this.gotoPositionSegmented(workPosition, signal, 1) } catch (error) {
             if (error.name === 'AbortError') throw error
-            console.warn(`Could not return after storage restock: ${error.message}`)
+            try {
+              const returned = await this.returnViaBuildAccess(workPosition, signal)
+              if (!returned) console.warn(`Could not return after storage restock: ${error.message}`)
+            } catch (accessError) {
+              if (accessError.name === 'AbortError') throw accessError
+              console.warn(
+                `Could not return after storage restock directly (${error.message}) or via saved build stairs (${accessError.message})`
+              )
+            }
           }
         }
       } finally {
         this.activity = previousActivity
+        if (movements) movements.allow1by1towers = previousTower
       }
     }
     if (withdrawn) console.log(`Restocked ${withdrawn} ${itemName} from nearby storage`)
     return withdrawn
   }
 
+  async returnViaBuildAccess(workPosition, signal) {
+    const access = this.landmarks?.get('active_build_access')
+    const dimension = this.bot.game?.dimension
+    if (!access || access.type !== 'build_access' || !Array.isArray(access.route) || access.route.length < 2) return false
+    if (access.dimension && dimension && access.dimension !== dimension) return false
+    const route = access.route
+      .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y) && Number.isFinite(point?.z))
+      .map((point) => new Vec3(Math.floor(point.x), Math.floor(point.y), Math.floor(point.z)))
+    if (route.length < 2) return false
+    const forwardDistance = route.at(-1).distanceTo(workPosition)
+    const reverseDistance = route[0].distanceTo(workPosition)
+    if (Math.min(forwardDistance, reverseDistance) > 24) return false
+    if (reverseDistance < forwardDistance) route.reverse()
+    await this.gotoPositionSegmented(route[0], signal, 1)
+    const movements = this.bot.pathfinder?.movements
+    const previousDrop = movements?.maxDropDown
+    if (movements) movements.maxDropDown = 1
+    try {
+      for (const point of route.slice(1)) {
+        if (signal.aborted) throw abortError()
+        await this.gotoBounded(new goals.GoalBlock(point.x, point.y, point.z), signal, 8)
+      }
+      await this.gotoPositionSegmented(workPosition, signal, 1)
+    } finally {
+      if (movements) movements.maxDropDown = previousDrop
+    }
+    console.log(`Returned from storage via saved ${route.length - 1}-step build staircase`)
+    return true
+  }
+
   async waitForBuildSupply(itemName, signal, waitMs = 60000) {
     const previousActivity = this.activity
+    const waitingPosition = this.bot.entity?.position?.floored?.() || null
     this.activity = `waiting for ${itemName} in nearby storage`
     try {
-      if (this.inventoryCount(itemName) > 0) return true
-      const deadline = Date.now() + waitMs
-      while (Date.now() < deadline) {
+      const hasSupply = () => itemName === 'build_scaffold'
+        ? Boolean(this.scaffoldItem())
+        : this.inventoryCount(itemName) > 0
+      if (hasSupply()) return true
+      const persistent = waitMs == null
+      const deadline = persistent ? Infinity : Date.now() + waitMs
+      while (persistent || Date.now() < deadline) {
         if (signal.aborted) throw abortError()
         try {
-          await this.tryWithdrawFromNearby(itemName, 1, signal)
+          if (itemName === 'build_scaffold') await this.ensurePlacementScaffold(signal)
+          // A single-item withdrawal creates a pathological loop for repeated
+          // wall/roof materials: resume, place once, return to the chest, and
+          // re-audit the entire blueprint. Pull a normal stack when available.
+          else await this.tryWithdrawFromNearby(itemName, 64, signal, {
+            forceInspect: persistent,
+            stayAtStorageWhenEmpty: persistent
+          })
         } catch (error) {
           if (error.name === 'AbortError') throw error
           console.warn(`Could not check storage for supplied ${itemName}: ${error.message}`)
         }
-        if (this.inventoryCount(itemName) > 0) return true
-        await wait(Math.min(3000, Math.max(1, deadline - Date.now())), signal)
+        if (hasSupply()) {
+          if (persistent && waitingPosition && this.bot.entity.position.distanceTo(waitingPosition) > 2) {
+            try {
+              await this.gotoPositionSegmented(waitingPosition, signal, 1)
+            } catch (error) {
+              if (error.name === 'AbortError') throw error
+              try { await this.returnViaBuildAccess(waitingPosition, signal) } catch {}
+            }
+          }
+          return true
+        }
+        const pollDelay = persistent
+          ? 15000
+          : Math.min(3000, Math.max(1, deadline - Date.now()))
+        if (!persistent) {
+          await wait(pollDelay, signal)
+          continue
+        }
+        await new Promise((resolve, reject) => {
+          let settled = false
+          const finish = () => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            signal.removeEventListener('abort', abort)
+            if (this.buildSupplyWake === finish) this.buildSupplyWake = null
+            resolve()
+          }
+          const abort = () => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            if (this.buildSupplyWake === finish) this.buildSupplyWake = null
+            reject(abortError())
+          }
+          const timer = setTimeout(finish, pollDelay)
+          this.buildSupplyWake = finish
+          signal.addEventListener('abort', abort, { once: true })
+        })
       }
-      return this.inventoryCount(itemName) > 0
+      return hasSupply()
     } finally {
       this.activity = previousActivity
     }
+  }
+
+  notifyBuildSupplyChanged() {
+    this.buildSupplyWake?.()
   }
 
   async pickup(action, signal) {
@@ -2743,16 +3005,43 @@ class ActionExecutor {
     const gotoPlacement = async (goal, radius) => {
       const movements = this.bot.pathfinder?.movements
       const previousTower = movements?.allow1by1towers
-      if (movements) movements.allow1by1towers = false
-      try {
-        return await this.gotoBounded(goal, signal, radius)
-      } catch (error) {
-        if (error.name === 'AbortError' || !action.trackTemporaryScaffold) throw error
-        console.warn(`Walking-only placement approach failed; trying tracked scaffolding: ${error.message}`)
-      } finally {
-        if (movements) movements.allow1by1towers = previousTower
+      const previousDrop = movements?.maxDropDown
+      const previousStepExclusions = movements ? [...movements.exclusionAreasStep] : null
+      // Once an upper-floor target has been reached, do not let A* choose a
+      // superficially cheap route that walks or drops all the way back to the
+      // build pad. Small two-block variations remain available for stairs and
+      // split-level interiors; larger gaps use the tracked walkway fallback.
+      const currentFeetY = this.bot.entity.position.floored().y
+      const minimumFeetY = action.buildBounds && target.y >= action.buildBounds.baseY + 4 &&
+        currentFeetY >= target.y - 2
+        ? Math.min(currentFeetY - 2, target.y - 3)
+        : null
+      if (movements) {
+        movements.allow1by1towers = false
+        if (minimumFeetY != null) {
+          movements.maxDropDown = 1
+          movements.exclusionAreasStep = [
+            ...previousStepExclusions,
+            (block) => block?.position?.y + 1 < minimumFeetY ? 100 : 0
+          ]
+        }
       }
-      return this.gotoBounded(goal, signal, radius)
+      try {
+        try {
+          return await this.gotoBounded(goal, signal, radius)
+        } catch (error) {
+          if (error.name === 'AbortError' || !action.trackTemporaryScaffold) throw error
+          console.warn(`Walking-only placement approach failed; trying tracked scaffolding: ${error.message}`)
+          if (movements) movements.allow1by1towers = previousTower
+          return await this.gotoBounded(goal, signal, radius)
+        }
+      } finally {
+        if (movements) {
+          movements.allow1by1towers = previousTower
+          movements.maxDropDown = previousDrop
+          movements.exclusionAreasStep = previousStepExclusions
+        }
+      }
     }
     this.assertNearby(target)
     const targetBlock = this.bot.blockAt(target)
@@ -2824,6 +3113,13 @@ class ActionExecutor {
       // recovery create a useful side support rather than retrying the same
       // impossible placement.
       faces = [...horizontalFaces, new Vec3(0, -1, 0)]
+    }
+    if (expectedBlock.endsWith('_trapdoor') && desiredFacing) {
+      // A trapdoor placed against a side derives its facing from the clicked
+      // face, not merely player yaw. Falling back to any available neighbor
+      // repeatedly produced the neighbor's direction and could never satisfy
+      // the schematic. Create support on the exact requested side if needed.
+      faces = [desiredFacing]
     }
     if (['lantern', 'soul_lantern'].includes(expectedBlock) && action.properties?.hanging != null) {
       faces = String(action.properties.hanging) === 'true'
@@ -2926,23 +3222,96 @@ class ActionExecutor {
       }
       exactStances.sort((a, b) => currentPosition.distanceTo(a) - currentPosition.distanceTo(b))
       let stanceFailure = null
-      for (const stance of exactStances.slice(0, 16)) {
+      const exactCandidates = exactStances.slice(0, 16)
+      if (exactCandidates.length) {
         try {
-          await gotoPlacement(new goals.GoalBlock(stance.x, stance.y, stance.z), 16)
-          if (placementInReach()) break
+          await gotoPlacement(new goals.GoalCompositeAny(
+            exactCandidates.map((stance) => new goals.GoalBlock(stance.x, stance.y, stance.z))
+          ), 16)
         } catch (error) {
           if (error.name === 'AbortError') throw error
           stanceFailure = error
         }
       }
+      // A plugin/server can occasionally resolve a composite goal without the
+      // bot actually satisfying any member. Only in that false-completion case
+      // fall back to individual stances; genuine no-path results stay bounded
+      // to the single composite search.
+      if (!placementInReach() && !stanceFailure) {
+        for (const stance of exactCandidates) {
+          try {
+            await gotoPlacement(new goals.GoalBlock(stance.x, stance.y, stance.z), 16)
+            if (placementInReach()) break
+          } catch (error) {
+            if (error.name === 'AbortError') throw error
+            stanceFailure = error
+            break
+          }
+        }
+      }
       if (!placementInReach() && stanceFailure) {
         console.warn(`Exact placement stances failed for ${action.block} at ${target}: ${stanceFailure.message}`)
+      }
+      let reachedInteriorStaging = false
+      const elevatedBuildPlacement = action.buildBounds && target.y >= action.buildBounds.baseY + 3
+      if (!placementInReach() && elevatedBuildPlacement) {
+        // A completed staircase may terminate on an upper landing elsewhere
+        // in a large house. Search all standable upper-floor cells in one A*
+        // request, then retry the short target approach from that landing.
+        const staging = this.interiorBuildStagingPositions(target, action.buildBounds)
+        if (staging.length) {
+          try {
+            await gotoPlacement(new goals.GoalCompositeAny(
+              staging.map((position) => new goals.GoalBlock(position.x, position.y, position.z))
+            ), 32)
+            reachedInteriorStaging = true
+            console.log(`Reached interior upper-floor staging at ${this.bot.entity.position.floored()} for ${target}`)
+            const fromLanding = [...exactStances].sort((a, b) =>
+              this.bot.entity.position.distanceTo(a) - this.bot.entity.position.distanceTo(b)
+            ).slice(0, 16)
+            if (fromLanding.length) {
+              try {
+                await gotoPlacement(new goals.GoalCompositeAny(
+                  fromLanding.map((stance) => new goals.GoalBlock(stance.x, stance.y, stance.z))
+                ), 16)
+              } catch (error) {
+                if (error.name === 'AbortError') throw error
+              }
+            }
+            if (!placementInReach()) {
+              const fromUpperLanding = [...scaffoldableStances].sort((a, b) =>
+                this.bot.entity.position.distanceTo(a) - this.bot.entity.position.distanceTo(b)
+              )
+              for (const stance of fromUpperLanding.slice(0, 24)) {
+                const crossed = await this.createPlacementWalkway(
+                  stance, signal, action.block, action.trackTemporaryScaffold
+                )
+                if (crossed && placementInReach()) break
+              }
+            }
+          } catch (error) {
+            if (error.name === 'AbortError') throw error
+            console.warn(`No completed interior route reached an upper landing for ${target}: ${error.message}`)
+          }
+        }
       }
       if (!placementInReach()) {
         scaffoldableStances.sort((a, b) => currentPosition.distanceTo(a) - currentPosition.distanceTo(b))
         for (const stance of scaffoldableStances.slice(0, 24)) {
           const climbed = await this.createPlacementStaircase(
             stance, signal, action.block, action.trackTemporaryScaffold
+          )
+          if (climbed && placementInReach()) break
+        }
+      }
+      if (!placementInReach() && elevatedBuildPlacement && !reachedInteriorStaging) {
+        // If the bot was returned to ground level inside a partially enclosed
+        // structure, straight ramps often collide with walls or roof pieces.
+        // Walk outside the footprint and approach the upper floor on a tracked
+        // scaffold ramp, like a player building from exterior staging.
+        for (const stance of scaffoldableStances.slice(0, 24)) {
+          const climbed = await this.createExteriorPlacementStaircase(
+            stance, action.buildBounds, signal, action.block, action.trackTemporaryScaffold
           )
           if (climbed && placementInReach()) break
         }
@@ -3019,7 +3388,19 @@ class ActionExecutor {
       await this.bot.lookAt(eye.plus(yawDirection.scaled(4)), true)
       await wait(75, signal)
     }
-    await this.bot.equip(item, 'hand')
+    // `item` was resolved before pathfinding. Long approaches, scaffold work,
+    // delayed server inventory updates, or an automatic restock can consume or
+    // replace that stack object. Resolve it again at the actual placement
+    // boundary instead of asking Mineflayer to equip a stale empty stack.
+    const placementItem = this.bot.inventory.items().find((entry) => entry.name === action.block)
+    if (!placementItem || placementItem.count <= 0) {
+      const error = new Error(
+        `missing build supply ${action.block}; the carried stack was depleted while approaching ${target}`
+      )
+      error.category = 'missing_resource'
+      throw error
+    }
+    await this.bot.equip(placementItem, 'hand')
     const placementOptions = {
       swingArm: 'right', forceLook: orientationByYaw ? 'ignore' : true,
       ...(['top', 'bottom'].includes(action.properties?.half) ? { half: action.properties.half } : {}),
@@ -3709,12 +4090,26 @@ class ActionExecutor {
       const done = result && typeof result === 'object' && 'done' in result ? result.done : Boolean(result)
       if (!requireTruthyResult || done) return result
       failures.push(`container at ${handle.block.position} made no progress`)
-      excluded.add(handle.block.position.toString())
+      this.excludeContainerFootprint(excluded, handle.block)
       if (!(result && typeof result === 'object' && 'progressed' in result)) {
         this.blockTracker.markUnreachable(handle.block.position, 'container operation made no progress')
       }
     }
     throw new Error(`nearby containers had no usable capacity${failures[0] ? `: ${failures[0]}` : ''}`)
+  }
+
+  excludeContainerFootprint(excluded, block) {
+    if (!block?.position) return excluded
+    excluded.add(block.position.toString())
+    if (!['chest', 'trapped_chest'].includes(block.name)) return excluded
+    for (const offset of [
+      new Vec3(1, 0, 0), new Vec3(-1, 0, 0),
+      new Vec3(0, 0, 1), new Vec3(0, 0, -1)
+    ]) {
+      const neighbor = this.bot.blockAt?.(block.position.plus(offset))
+      if (neighbor?.name === block.name) excluded.add(neighbor.position.toString())
+    }
+    return excluded
   }
 
   async withRememberedContainer(

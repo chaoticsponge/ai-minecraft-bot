@@ -15,7 +15,9 @@ const {
   worldProgressFingerprint,
   applyTaskProgressResume,
   missingEquipmentForFailure,
-  missingBuildMaterialForFailure
+  missingBuildMaterialForFailure,
+  missingBuildQuantityForFailure,
+  isBuildSupplyAcknowledgement
 } = require('../src/controller/bot-controller')
 
 function botWith(items) {
@@ -103,6 +105,18 @@ test('extracts missing schematic materials for deterministic player assistance',
   assert.equal(missingBuildMaterialForFailure({
     category: 'missing_resource', action: { type: 'collect' }, error: 'missing build supply stone'
   }), null)
+  assert.equal(missingBuildQuantityForFailure({
+    error: 'missing build supply packed_mud; need 4 remaining for this build, put some in a nearby chest'
+  }), 4)
+  assert.equal(missingBuildQuantityForFailure({ error: 'cannot support floating build block' }), null)
+})
+
+test('recognizes build-supply updates without treating them as replacement goals', () => {
+  assert.equal(isBuildSupplyAcknowledgement('packed mud in chest for you', 'packed_mud'), true)
+  assert.equal(isBuildSupplyAcknowledgement("it's in", 'packed_mud'), true)
+  assert.equal(isBuildSupplyAcknowledgement('I added the blocks', 'packed_mud'), true)
+  assert.equal(isBuildSupplyAcknowledgement('build me a mud house', 'packed_mud'), false)
+  assert.equal(isBuildSupplyAcknowledgement('packed mud is interesting', 'packed_mud'), false)
 })
 
 test('planner retries use bounded exponential backoff and remain interruptible', async () => {
