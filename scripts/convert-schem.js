@@ -10,8 +10,9 @@ const FALLBACK_BLOCKS = {
   polished_cinnabar_stairs: 'polished_tuff_stairs'
 }
 const ITEM_FOR_BLOCK = {
-  white_wall_banner: 'white_banner',
-  wall_torch: 'torch'
+  wall_torch: 'torch',
+  soul_wall_torch: 'soul_torch',
+  redstone_wall_torch: 'redstone_torch'
 }
 const REPLACE_BLOCK = {
   water_cauldron: 'cauldron',
@@ -74,6 +75,16 @@ function parseState(raw) {
   return { block: match[1], properties }
 }
 
+function itemForBlock(block) {
+  if (ITEM_FOR_BLOCK[block]) return ITEM_FOR_BLOCK[block]
+  if (block.endsWith('_wall_hanging_sign')) return block.replace('_wall_hanging_sign', '_hanging_sign')
+  if (block.endsWith('_wall_sign')) return block.replace('_wall_sign', '_sign')
+  if (block.endsWith('_wall_banner')) return block.replace('_wall_banner', '_banner')
+  if (block.endsWith('_wall_skull')) return block.replace('_wall_skull', '_skull')
+  if (block.endsWith('_wall_head')) return block.replace('_wall_head', '_head')
+  return block
+}
+
 function compatibleEntry(raw, trimTerrain, substitutions) {
   const parsed = parseState(raw)
   let block = FALLBACK_BLOCKS[parsed.block] || REPLACE_BLOCK[parsed.block] || parsed.block
@@ -81,7 +92,7 @@ function compatibleEntry(raw, trimTerrain, substitutions) {
   if (OMIT_BLOCKS.has(block) || (trimTerrain && TERRAIN_BLOCKS.has(block))) return null
   if (!registry.blocksByName[block]) throw new Error(`Minecraft 1.21.11 has no block named ${block}`)
   const properties = REPLACE_BLOCK[parsed.block] ? {} : parsed.properties
-  const item = ITEM_FOR_BLOCK[block] || block
+  const item = itemForBlock(block)
   if (!registry.itemsByName[item]) throw new Error(`Minecraft 1.21.11 has no placeable item for ${block}`)
   return {
     block,
@@ -173,7 +184,11 @@ async function main() {
   if (substitutions.size) console.log(`Substitutions: ${JSON.stringify(output.importNotes.substitutions)}`)
 }
 
-main().catch((error) => {
-  console.error(`Conversion failed: ${error.message}`)
-  process.exitCode = 1
-})
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`Conversion failed: ${error.message}`)
+    process.exitCode = 1
+  })
+}
+
+module.exports = { itemForBlock, parseState }

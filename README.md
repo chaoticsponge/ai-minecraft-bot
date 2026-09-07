@@ -173,7 +173,7 @@ Sticks are retained by default because the bot needs them to replace tools. See 
 - Maintain tools and ask the player when required equipment cannot be acquired
 - Dig straight staircases and player-style branch/strip mines, collect safe ore veins, and place torches
 - Follow or guard players and react to hunger, damage, lava, drowning, falls, and hostile mobs
-- Farm crops and build validated local JSON schematics
+- Farm crops and build validated local JSON schematics, including directional and multi-block doors/beds
 - Save progress across disconnects and controlled restarts
 
 The AI can only select validated high-level actions. It cannot execute code or issue arbitrary server commands.

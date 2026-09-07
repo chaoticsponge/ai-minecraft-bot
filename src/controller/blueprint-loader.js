@@ -92,6 +92,11 @@ class BlueprintLoader {
 
   itemCount(entry) {
     const block = entry.block || entry.material
+    // Doors and beds occupy two world cells but are placed from one inventory
+    // item. Their upper/head entries are results of placing the owner half.
+    if (block?.endsWith('_door') && entry.properties?.half === 'upper') return 0
+    if (block?.endsWith('_bed') && entry.properties?.part === 'head') return 0
+    if (block?.endsWith('_slab') && entry.properties?.type === 'double') return 2
     const property = block?.endsWith('_candle') ? 'candles'
       : block === 'sea_pickle' ? 'pickles'
         : block === 'turtle_egg' ? 'eggs'

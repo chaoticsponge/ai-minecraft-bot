@@ -8,7 +8,10 @@ const FACING_VECTOR = {
   north: new Vec3(0, 0, -1), south: new Vec3(0, 0, 1),
   east: new Vec3(1, 0, 0), west: new Vec3(-1, 0, 0)
 }
-const SCAFFOLD_BLOCKS = new Set(['dirt', 'cobblestone', 'stone', 'cobbled_deepslate', 'netherrack'])
+const SCAFFOLD_BLOCKS = new Set([
+  'dirt', 'cobblestone', 'stone', 'cobbled_deepslate', 'netherrack',
+  'tuff', 'andesite', 'diorite', 'granite', 'calcite', 'sandstone', 'smooth_sandstone'
+])
 const OPTIONAL_DECOR = new Set([
   'anvil', 'barrel', 'beehive', 'bookshelf', 'brewing_stand', 'cake', 'campfire',
   'cauldron', 'chest', 'chiseled_bookshelf', 'composter', 'crafting_table',
@@ -90,6 +93,7 @@ class BlueprintTask {
     // placed. Treating those as structural mismatches makes resume repeatedly
     // tear out correct blocks and can never converge on a large schematic.
     const strictProperties = new Set(['facing', 'axis', 'half'])
+    if (expectedBlock?.endsWith('_bed')) strictProperties.add('part')
     if (expectedBlock?.endsWith('_slab')) strictProperties.add('type')
     if (/(?:_door|_trapdoor|_fence_gate)$/.test(expectedBlock)) strictProperties.add('open')
     if (['lantern', 'soul_lantern'].includes(expectedBlock)) strictProperties.add('hanging')
@@ -198,6 +202,73 @@ class BlueprintTask {
     if (/(?:_door|_trapdoor|_button|_pressure_plate|_torch)$/.test(name) ||
         ['torch', 'soul_torch', 'lantern', 'soul_lantern', 'ladder', 'lever'].includes(name)) return 1
     return 0
+  }
+
+  buildPlacementRank(entry) {
+    const name = entry.block || entry.material
+    // Multi-block items must be placed from the half that owns the inventory
+    // item. Minecraft creates the other half automatically.
+    if (name?.endsWith('_door')) return entry.properties?.half === 'upper' ? 2 : 0
+    if (name?.endsWith('_bed')) return entry.properties?.part === 'head' ? 2 : 0
+    return 1
+  }
+
+  multiBlockOwnerPosition(entry) {
+    const name = entry.block || entry.material
+    if (name?.endsWith('_door') && entry.properties?.half === 'upper') {
+      return entry.position.offset(0, -1, 0)
+    }
+    if (name?.endsWith('_bed') && entry.properties?.part === 'head') {
+      const facing = FACING_VECTOR[entry.properties?.facing]
+      return facing ? entry.position.minus(facing) : entry.position
+    }
+    return entry.position
+  }
+
+  multiBlockPartnerPosition(entry) {
+    const name = entry.block || entry.material
+    if (name?.endsWith('_door') && entry.properties?.half === 'lower') {
+      return entry.position.offset(0, 1, 0)
+    }
+    if (name?.endsWith('_bed') && entry.properties?.part === 'foot') {
+      const facing = FACING_VECTOR[entry.properties?.facing]
+      return facing ? entry.position.plus(facing) : null
+    }
+    return null
+  }
+
+  pendingPlacements(blocks) {
+    const expectedAt = new Map(blocks.map((entry) => [entry.position.toString(), entry]))
+    const groups = new Map()
+    for (const entry of blocks) {
+      const ownerPosition = this.multiBlockOwnerPosition(entry)
+      const owner = expectedAt.get(ownerPosition.toString()) || entry
+      const key = owner.position.toString()
+      if (!groups.has(key)) groups.set(key, { owner, components: [] })
+      groups.get(key).components.push(entry)
+    }
+    const pending = []
+    for (const { owner, components } of groups.values()) {
+      const mismatched = components.filter((entry) => !this.matchesEntry(this.bot.blockAt(entry.position), entry))
+      if (!mismatched.length) continue
+      const partner = this.multiBlockPartnerPosition(owner)
+      pending.push({
+        ...owner,
+        progressCredit: mismatched.length,
+        ...(partner ? {
+          repairCoupled: true,
+          coupledPositions: components
+            .filter((entry) => !entry.position.equals(owner.position))
+            .map((entry) => entry.position)
+        } : {})
+      })
+    }
+    const feet = this.bot.entity?.position?.floored?.()
+    const occupiesBot = (entry) => feet &&
+      (entry.position.equals(feet) || entry.position.equals(feet.offset(0, 1, 0)))
+    return pending.sort((a, b) => this.buildPhase(a) - this.buildPhase(b) ||
+      Number(occupiesBot(a)) - Number(occupiesBot(b)) || a.y - b.y ||
+      this.buildPlacementRank(a) - this.buildPlacementRank(b))
   }
 
   async ensureBuildSupply(material, remaining, signal, optional = false, neededNow = 1) {
@@ -433,7 +504,19 @@ class BlueprintTask {
     ).map((candidate) => candidate.position)
   }
 
-  async walkToBuildSite(action, blueprint, signal) {
+  async walkToBuildSite(action, blueprint, signal, established = false) {
+    const current = this.bot.entity.position.floored()
+    const footprint = this.footprintColumns(action, blueprint)
+    const xs = footprint.map((position) => position.x)
+    const zs = footprint.map((position) => position.z)
+    const insideEstablishedSite = current.x >= Math.min(...xs) - 1 && current.x <= Math.max(...xs) + 1 &&
+      current.z >= Math.min(...zs) - 1 && current.z <= Math.max(...zs) + 1 &&
+      current.y >= Math.floor(action.y) && current.y <= Math.floor(action.y) + (blueprint.size?.y || 1) + 1
+    // A resumed builder may be standing safely on an upper floor or tracked
+    // scaffold inside completed exterior walls. Forcing it back to the initial
+    // ground-level edge can be impossible and adds no safety value.
+    if (established && insideEstablishedSite) return current
+
     const approaches = this.buildApproaches(action, blueprint)
     let failure = null
     for (const position of approaches.slice(0, 12)) {
@@ -493,10 +576,8 @@ class BlueprintTask {
     const staging = anchor.minus(forward.scaled(2))
     this.rememberStructure(action)
     const { blocks, remaining, alreadyPlaced } = this.audit(action, blueprint)
-    const pending = blocks
-      .filter((entry) => !this.matchesEntry(this.bot.blockAt(entry.position), entry))
-      .sort((a, b) => this.buildPhase(a) - this.buildPhase(b) || a.y - b.y)
-    const buildApproach = await this.walkToBuildSite(action, blueprint, signal)
+    const pending = this.pendingPlacements(blocks)
+    const buildApproach = await this.walkToBuildSite(action, blueprint, signal, alreadyPlaced > 0)
     const task = rootTask.child('build', `build ${action.schematic}`, { placed: alreadyPlaced, total: blocks.length })
     task.start()
     const materials = {}
@@ -542,6 +623,12 @@ class BlueprintTask {
     try {
       for (const entry of pending) {
         if (signal.aborted) throw Object.assign(new Error('Task cancelled'), { name: 'AbortError' })
+        task.detail.current = {
+          block: entry.block || entry.material,
+          x: entry.position.x,
+          y: entry.position.y,
+          z: entry.position.z
+        }
         const phase = this.buildPhase(entry)
         if (phase !== activePhase) {
           activePhase = phase
@@ -549,9 +636,9 @@ class BlueprintTask {
           onProgress?.(task)
         }
         const position = entry.position
-        const current = this.bot.blockAt(position)
-        if (this.matchesEntry(current, entry) && !scaffolds.has(position.toString())) {
-          task.detail.placed += 1
+        let current = this.bot.blockAt(position)
+        if (this.matchesEntry(current, entry) && !entry.repairCoupled && !scaffolds.has(position.toString())) {
+          task.detail.placed += entry.progressCredit || 1
           remaining[entry.material] = Math.max(0,
             (remaining[entry.material] || this.entryItemCount(entry)) - this.entryItemCount(entry))
           continue
@@ -560,6 +647,16 @@ class BlueprintTask {
           skippedOptional[entry.material] = (skippedOptional[entry.material] || 0) + 1
           continue
         }
+        // A door or bed cannot have one half placed independently. Clear its
+        // generated partner first, then place the owner half once so Minecraft
+        // recreates the complete object with consistent state.
+        for (const coupledPosition of entry.coupledPositions || []) {
+          const coupled = this.bot.blockAt(coupledPosition)
+          if (coupled && coupled.boundingBox !== 'empty') {
+            await this.clearBuildPosition(coupledPosition, signal, requiredNames.has(coupled.name))
+          }
+        }
+        current = this.bot.blockAt(position)
         if (current && current.boundingBox !== 'empty') {
           const wasTemporaryScaffold = scaffolds.delete(position.toString())
           const reclaimed = wasTemporaryScaffold || requiredNames.has(current.name)
@@ -602,7 +699,7 @@ class BlueprintTask {
           },
           ...(entry.properties ? { properties: entry.properties } : {})
         }, signal)
-        task.detail.placed += 1
+        task.detail.placed += entry.progressCredit || 1
         remaining[entry.material] = Math.max(0,
           (remaining[entry.material] || this.entryItemCount(entry)) - this.entryItemCount(entry))
         if (task.detail.placed % 8 === 0 || task.detail.placed === task.detail.total) onProgress?.(task)

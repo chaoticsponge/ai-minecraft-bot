@@ -26,7 +26,15 @@ const CARDINAL_DIRECTIONS = {
   east: new Vec3(1, 0, 0),
   west: new Vec3(-1, 0, 0)
 }
-const SCAFFOLD_BLOCKS = new Set(['dirt', 'cobblestone', 'stone', 'cobbled_deepslate', 'netherrack'])
+const SCAFFOLD_PRIORITY = [
+  'dirt', 'cobblestone', 'cobbled_deepslate', 'stone', 'netherrack',
+  'tuff', 'andesite', 'diorite', 'granite', 'calcite', 'sandstone', 'smooth_sandstone'
+]
+const SCAFFOLD_BLOCKS = new Set(SCAFFOLD_PRIORITY)
+const SCAFFOLD_RESTOCK_PRIORITY = [
+  'cobbled_deepslate', 'cobblestone', 'dirt', 'stone', 'netherrack',
+  'tuff', 'andesite', 'diorite', 'granite', 'calcite', 'sandstone', 'smooth_sandstone'
+]
 const MINING_STORAGE_ITEMS = new Set([
   'stone', 'cobblestone', 'deepslate', 'cobbled_deepslate', 'tuff', 'calcite',
   'granite', 'diorite', 'andesite', 'gravel', 'flint', 'dirt', 'sand', 'red_sand'
@@ -1683,7 +1691,10 @@ class ActionExecutor {
   }
 
   scaffoldItem() {
-    return this.bot.inventory.items().find((item) => SCAFFOLD_BLOCKS.has(item.name)) || null
+    const items = this.bot.inventory.items()
+    return SCAFFOLD_PRIORITY
+      .map((name) => items.find((item) => item.name === name))
+      .find(Boolean) || null
   }
 
   async ensurePlacementScaffold(signal, preserveItem = null) {
@@ -1697,7 +1708,7 @@ class ActionExecutor {
         minimumFreeSlots: 1
       })
     }
-    for (const name of ['cobbled_deepslate', 'cobblestone', 'dirt', 'stone', 'netherrack']) {
+    for (const name of SCAFFOLD_RESTOCK_PRIORITY) {
       await this.tryWithdrawFromNearby(name, 16, signal)
       scaffold = this.scaffoldItem()
       if (scaffold) {
@@ -1706,6 +1717,84 @@ class ActionExecutor {
       }
     }
     return null
+  }
+
+  async createPlacementSupport(position, signal, preserveItem = null, maxDepth = 6) {
+    const created = []
+    const repairWithRestock = async (candidate) => {
+      try {
+        return await this.repairStairFloor(candidate, signal)
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+        if (/cannot reach staircase break/.test(error.message)) {
+          await this.gotoBounded(new goals.GoalNear(candidate.x, candidate.y, candidate.z, 2), signal, 10)
+          return this.repairStairFloor(candidate, signal)
+        }
+        if (/no dirt or stone blocks/.test(error.message)) {
+          const scaffold = await this.ensurePlacementScaffold(signal, preserveItem)
+          if (!scaffold) throw error
+          return this.repairStairFloor(candidate, signal)
+        }
+        throw error
+      }
+    }
+    const build = async (candidate, depth) => {
+      const existing = this.bot.blockAt(candidate)
+      if (existing && !this.isPassable(existing) && !this.isLiquid(existing)) return
+      try {
+        const placed = await repairWithRestock(candidate)
+        if (placed) created.push(candidate.clone())
+        return
+      } catch (error) {
+        if (error.name === 'AbortError' || !/no solid face available/.test(error.message) || depth >= maxDepth) throw error
+      }
+      const below = candidate.offset(0, -1, 0)
+      const belowBlock = this.bot.blockAt(below)
+      if (!belowBlock || this.isLiquid(belowBlock)) {
+        throw new Error(`cannot support floating build block at ${position}; unsafe column below ${below}`)
+      }
+      await build(below, depth + 1)
+      const placed = await repairWithRestock(candidate)
+      if (placed) created.push(candidate.clone())
+    }
+    await build(position, 0)
+    return created
+  }
+
+  async createPlacementStaircase(stance, signal, preserveItem = null, trackScaffold = null) {
+    const start = this.bot.entity.position.floored()
+    const rise = stance.y - start.y
+    const dx = stance.x - start.x
+    const dz = stance.z - start.z
+    const steps = Math.max(Math.abs(dx), Math.abs(dz))
+    if (rise < 1 || rise > 6 || steps < rise || steps > 10) return false
+    for (let index = 1; index <= steps; index += 1) {
+      const feet = new Vec3(
+        start.x + Math.round(dx * index / steps),
+        start.y + Math.min(index, rise),
+        start.z + Math.round(dz * index / steps)
+      )
+      const feetBlock = this.bot.blockAt(feet)
+      const headBlock = this.bot.blockAt(feet.offset(0, 1, 0))
+      if (!this.isPassable(feetBlock) || !this.isPassable(headBlock) ||
+          this.isLiquid(feetBlock) || this.isLiquid(headBlock)) return false
+      const floor = feet.offset(0, -1, 0)
+      const floorBlock = this.bot.blockAt(floor)
+      if (!floorBlock || this.isPassable(floorBlock)) {
+        const created = await this.createPlacementSupport(floor, signal, preserveItem)
+        for (const position of created) trackScaffold?.(position)
+      } else if (this.isLiquid(floorBlock)) {
+        return false
+      }
+      try {
+        await this.gotoBounded(new goals.GoalBlock(feet.x, feet.y, feet.z), signal, 10)
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+        return false
+      }
+      if (this.bot.entity.position.distanceTo(feet) > 0.9) return false
+    }
+    return this.bot.entity.position.distanceTo(stance) <= 0.9
   }
 
   async repairStairFloor(position, signal) {
@@ -2683,9 +2772,7 @@ class ActionExecutor {
     const facesAwayFromPlayer = /(?:_trapdoor|_chest|_furnace|_barrel|_beehive|_bookshelf|_shelf|_loom)$/.test(expectedBlock)
     const orientationByYaw = facesWithPlayer || facesAwayFromPlayer
     const yawDirection = desiredFacing && orientationByYaw
-      ? (expectedBlock.endsWith('_stairs') || facesAwayFromPlayer
-          ? desiredFacing.scaled(-1)
-          : desiredFacing)
+      ? (facesAwayFromPlayer ? desiredFacing.scaled(-1) : desiredFacing)
       : null
     if (desiredFacing) {
       // Stairs, doors, beds, and campfires follow the player's look direction;
@@ -2778,9 +2865,9 @@ class ActionExecutor {
         const current = this.bot.blockAt(supportPosition)
         if (!current || !this.isPassable(current) || this.isLiquid(current)) continue
         try {
-          const created = await this.repairStairFloor(supportPosition, signal)
-          if (!created) continue
-          action.trackTemporaryScaffold?.(supportPosition.clone())
+          const created = await this.createPlacementSupport(supportPosition, signal, action.block)
+          if (!created.length) continue
+          for (const scaffoldPosition of created) action.trackTemporaryScaffold?.(scaffoldPosition)
           face = faces.find((candidate) => {
             const reference = this.bot.blockAt(target.minus(candidate))
             return reference && reference.boundingBox !== 'empty'
@@ -2796,8 +2883,76 @@ class ActionExecutor {
       }
     }
     if (!face) throw new Error(`No solid neighboring block to place against at ${target}; no scaffold support was possible`)
-    if (this.bot.entity.position.distanceTo(target) > 4) {
-      await gotoPlacement(new goals.GoalNear(target.x, target.y, target.z, 3), 16)
+    const placementInReach = () => {
+      const eye = this.bot.entity.position.offset(0, 1.62, 0)
+      const clickPoint = target.offset(0.5, 0.5, 0.5)
+      const reference = this.bot.blockAt(target.minus(face))
+      return eye.distanceTo(clickPoint) <= 4.5 && reference &&
+        (typeof this.bot.canSeeBlock !== 'function' || this.bot.canSeeBlock(reference))
+    }
+    if (!placementInReach()) {
+      const reachGoal = this.bot.world?.getBlock && goals.GoalPlaceBlock
+        ? new goals.GoalPlaceBlock(target, this.bot.world, { range: 4.5, faces: [face.scaled(-1)] })
+        : new goals.GoalNear(target.x, target.y, target.z, 2)
+      try {
+        await gotoPlacement(reachGoal, 16)
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+        console.warn(`Placement-aware approach failed for ${action.block} at ${target}: ${error.message}`)
+      }
+    }
+    if (!placementInReach()) {
+      const currentPosition = this.bot.entity.position
+      const exactStances = []
+      const scaffoldableStances = []
+      for (const y of [target.y, target.y - 1, target.y + 1, target.y - 2]) {
+        for (let radius = 1; radius <= 3; radius += 1) {
+          for (let dx = -radius; dx <= radius; dx += 1) {
+            for (let dz = -radius; dz <= radius; dz += 1) {
+              if (Math.max(Math.abs(dx), Math.abs(dz)) !== radius) continue
+              const stance = new Vec3(target.x + dx, y, target.z + dz)
+              const eye = stance.offset(0.5, 1.62, 0.5)
+              if (eye.distanceTo(target.offset(0.5, 0.5, 0.5)) > 4.5) continue
+              const feetBlock = this.bot.blockAt(stance)
+              const headBlock = this.bot.blockAt(stance.offset(0, 1, 0))
+              if (this.isPassable(feetBlock) && this.isPassable(headBlock) &&
+                  !this.isLiquid(feetBlock) && !this.isLiquid(headBlock)) {
+                scaffoldableStances.push(stance)
+                if (this.canStandAt(stance)) exactStances.push(stance)
+              }
+            }
+          }
+        }
+      }
+      exactStances.sort((a, b) => currentPosition.distanceTo(a) - currentPosition.distanceTo(b))
+      let stanceFailure = null
+      for (const stance of exactStances.slice(0, 16)) {
+        try {
+          await gotoPlacement(new goals.GoalBlock(stance.x, stance.y, stance.z), 16)
+          if (placementInReach()) break
+        } catch (error) {
+          if (error.name === 'AbortError') throw error
+          stanceFailure = error
+        }
+      }
+      if (!placementInReach() && stanceFailure) {
+        console.warn(`Exact placement stances failed for ${action.block} at ${target}: ${stanceFailure.message}`)
+      }
+      if (!placementInReach()) {
+        scaffoldableStances.sort((a, b) => currentPosition.distanceTo(a) - currentPosition.distanceTo(b))
+        for (const stance of scaffoldableStances.slice(0, 24)) {
+          const climbed = await this.createPlacementStaircase(
+            stance, signal, action.block, action.trackTemporaryScaffold
+          )
+          if (climbed && placementInReach()) break
+        }
+      }
+    }
+    if (!placementInReach()) {
+      throw new Error(
+        `no player-reachable placement stance for ${action.block} at ${target}; ` +
+        `feet=${this.bot.entity.position.floored()}`
+      )
     }
     // Support placement and final approach navigation may move the bot into the
     // destination after the initial target check. Step clear at the last moment.
@@ -2837,6 +2992,13 @@ class ActionExecutor {
       }
       if (desiredFacing) await this.bot.lookAt(target.offset(0.5, 0.5, 0.5), !orientationByYaw)
     }
+    // Stop every placement approach—not only yaw-sensitive ones—and wait for
+    // its last movement/build packet before inspecting the destination. A late
+    // pathfinder tower packet can otherwise replace the intended schematic
+    // block with its scaffold after placement begins.
+    this.bot.pathfinder?.setGoal?.(null)
+    this.bot.clearControlStates?.()
+    await wait(100, signal)
     const finalTarget = this.bot.blockAt(target)
     if (!finalTarget || (finalTarget.name !== 'air' && finalTarget.boundingBox !== 'empty')) {
       if (finalTarget?.diggable && SCAFFOLD_BLOCKS.has(finalTarget.name)) {
@@ -2853,11 +3015,6 @@ class ActionExecutor {
     if (yawDirection) {
       // In this Mineflayer version force-look updates the desired yaw, while
       // the actual player-look packet is emitted on the next physics tick.
-      // Cancel residual path movement first, then allow one tick to transmit
-      // the cardinal yaw before sending use_item_on.
-      this.bot.pathfinder?.setGoal?.(null)
-      this.bot.clearControlStates?.()
-      await wait(75, signal)
       const eye = this.bot.entity.position.offset(0, 1.62, 0)
       await this.bot.lookAt(eye.plus(yawDirection.scaled(4)), true)
       await wait(75, signal)
@@ -2935,6 +3092,7 @@ class ActionExecutor {
     const mismatches = []
     if (placed?.name !== expectedBlock) mismatches.push(`block=${placed?.name || 'unloaded'} instead of ${expectedBlock}`)
     const strictProperties = new Set(['facing', 'axis', 'half'])
+    if (expectedBlock.endsWith('_bed')) strictProperties.add('part')
     if (expectedBlock.endsWith('_slab')) strictProperties.add('type')
     if (/(?:_door|_trapdoor|_fence_gate)$/.test(expectedBlock)) strictProperties.add('open')
     if (['lantern', 'soul_lantern'].includes(expectedBlock)) strictProperties.add('hanging')
@@ -2985,6 +3143,16 @@ class ActionExecutor {
         if (Date.now() >= deadline) return false
         await wait(100, signal)
       } while (true)
+    }
+
+    if (expectedBlock.endsWith('_slab') && action.properties?.type === 'double' &&
+        placed?.getProperties?.()?.type !== 'double') {
+      const secondSlab = this.bot.inventory.items().find((entry) => entry.name === action.block)
+      if (secondSlab) {
+        await this.bot.equip(secondSlab, 'hand')
+        await this.bot.activateBlock(placed)
+        await waitForProperty('type', 'double')
+      }
     }
 
     if (/(?:_door|_trapdoor|_fence_gate)$/.test(expectedBlock) && action.properties?.open != null) {

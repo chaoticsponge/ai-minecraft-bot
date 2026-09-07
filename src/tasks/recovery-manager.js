@@ -12,9 +12,9 @@ function classifyFailure(error) {
   if (/inventory full|cannot carry more/.test(message)) return 'inventory_full'
   if (/container.*(?:full|accepted only)/.test(message)) return 'container_full'
   if (/no reachable (?:chest|barrel)|nearest container has/.test(message)) return 'container_unavailable'
-  if (/stuck|no path|path.*timeout|took too long|timed out|goal was changed|unreachable/.test(message)) return 'navigation'
-  if (/socket|disconnected|unloaded|chunk/.test(message)) return 'transient_world'
-  if (/missing|need .* (?:to|for)|no .*inventory|no available recipe|no usable|replacement materials|ran out/.test(message)) return 'missing_resource'
+  if (/stuck|no path|path.*timeout|took too long|timed out|goal was changed|unreachable|no player-reachable placement stance/.test(message)) return 'navigation'
+  if (/socket|disconnected|unloaded|chunk|blockupdate.*did not fire|placement acknowledgement|schematic placement mismatch/.test(message)) return 'transient_world'
+  if (/missing|need .* (?:to|for)|no .*inventory|no available recipe|no usable|no dirt or stone blocks|replacement materials|ran out/.test(message)) return 'missing_resource'
   if (/obstructed|unbreakable|unsafe|lava|water|not empty|not diggable/.test(message)) return 'unsafe_or_blocked'
   return 'skill_error'
 }
@@ -27,7 +27,12 @@ class RecoveryManager {
   }
 
   async run(action, parentSignal, task, operation) {
-    const maxRetries = SAFE_RETRY_ACTIONS.has(action.type) ? 1 : 0
+    // Large builds encounter occasional late/dropped block acknowledgements.
+    // They are idempotent and audited on every pass, so tolerate a few local
+    // transient retries without asking the LLM to rediscover the same plan.
+    const maxRetries = ['build_schematic', 'repair_schematic'].includes(action.type)
+      ? 3
+      : SAFE_RETRY_ACTIONS.has(action.type) ? 1 : 0
     for (let attempt = 0; ; attempt += 1) {
       const controller = new AbortController()
       const abort = () => controller.abort()
@@ -35,7 +40,7 @@ class RecoveryManager {
       const monitor = this.monitor(controller, action, task)
       try {
         task.detail.attempt = attempt + 1
-        return await operation(controller.signal)
+        return await Promise.race([operation(controller.signal), monitor.failure])
       } catch (original) {
         if (parentSignal.aborted) throw original
         const error = monitor.stalled
@@ -47,7 +52,47 @@ class RecoveryManager {
         const recovery = task.child('recovery', `recover from ${error.category}`, { attempt: attempt + 1, error: error.message })
         recovery.start()
         try {
-          const result = await this.executor.recoverStuck(monitor.startPosition, parentSignal)
+          let result
+          if (error.category === 'transient_world') {
+            await new Promise((resolve, reject) => {
+              if (parentSignal.aborted) return reject(Object.assign(new Error('Task cancelled'), { name: 'AbortError' }))
+              const finish = () => {
+                parentSignal.removeEventListener('abort', abort)
+                resolve()
+              }
+              const abort = () => {
+                clearTimeout(timer)
+                reject(Object.assign(new Error('Task cancelled'), { name: 'AbortError' }))
+              }
+              const timer = setTimeout(finish, 500)
+              parentSignal.addEventListener('abort', abort, { once: true })
+            })
+            result = 'waited for the world and inventory state to settle'
+          } else {
+            const recoveryController = new AbortController()
+            const abortRecovery = () => recoveryController.abort()
+            parentSignal.addEventListener('abort', abortRecovery, { once: true })
+            let recoveryTimedOut = false
+            const timeout = setTimeout(() => {
+              recoveryTimedOut = true
+              recoveryController.abort()
+              this.executor.stop?.()
+            }, this.stallMs)
+            try {
+              result = await Promise.race([
+                this.executor.recoverStuck(monitor.startPosition, recoveryController.signal),
+                new Promise((resolve, reject) => recoveryController.signal.addEventListener('abort', () => {
+                  reject(Object.assign(new Error('recovery movement timed out'), { name: 'AbortError' }))
+                }, { once: true }))
+              ])
+            } catch (recoveryError) {
+              if (!recoveryTimedOut || parentSignal.aborted) throw recoveryError
+              result = 'cancelled stalled recovery movement and will re-audit the action'
+            } finally {
+              clearTimeout(timeout)
+              parentSignal.removeEventListener('abort', abortRecovery)
+            }
+          }
           recovery.complete(result)
           task.currentChild = null
         } catch (recoveryError) {
@@ -65,7 +110,8 @@ class RecoveryManager {
     const startPosition = this.bot.entity.position.clone()
     let lastPosition = startPosition.clone()
     let lastProgressAt = Date.now()
-    let lastDetail = JSON.stringify(task.detail)
+    const currentDetail = () => JSON.stringify(task.activeLeaf?.()?.detail || task.detail)
+    let lastDetail = currentDetail()
     const ignoresInactivity = action.type === 'wait'
     const markProgress = () => { lastProgressAt = Date.now() }
     const markNearbyBlockProgress = (oldBlock, newBlock) => {
@@ -78,9 +124,12 @@ class RecoveryManager {
     this.bot.on?.('blockUpdate', markNearbyBlockProgress)
     this.bot.on?.('playerCollect', markOwnCollection)
     this.bot.inventory?.on?.('updateSlot', markProgress)
+    let rejectFailure
+    const failure = new Promise((resolve, reject) => { rejectFailure = reject })
     const state = {
       stalled: false,
       startPosition,
+      failure,
       stop: () => {
         clearInterval(timer)
         this.bot.off?.('blockUpdate', markNearbyBlockProgress)
@@ -92,7 +141,7 @@ class RecoveryManager {
     const timer = setInterval(() => {
       const active = this.bot.pathfinder.isMoving?.() || this.bot.pathfinder.isMining?.() || this.bot.pathfinder.isBuilding?.()
       const position = this.bot.entity.position
-      const detail = JSON.stringify(task.detail)
+      const detail = currentDetail()
       if (position.distanceTo(lastPosition) > 0.3 || detail !== lastDetail) {
         lastPosition = position.clone()
         lastDetail = detail
@@ -100,14 +149,19 @@ class RecoveryManager {
         return
       }
       const timeout = active ? this.stallMs : this.stallMs * 2
-      if (!ignoresInactivity && Date.now() - lastProgressAt >= timeout) {
+      if (!state.stalled && !ignoresInactivity && Date.now() - lastProgressAt >= timeout) {
         state.stalled = true
-        console.warn(
-          `Progress watchdog: ${action.type} made no observable progress for ${Math.max(1, Math.round(timeout / 1000))}s ` +
+        const leaf = task.activeLeaf?.()
+        const target = leaf?.detail?.current
+        const targetText = target
+          ? ` while handling ${target.block} at ${target.x},${target.y},${target.z}`
+          : ''
+        const message = `Progress watchdog: ${action.type} made no observable progress for ${Math.max(1, Math.round(timeout / 1000))}s ` +
           `at ${Math.floor(position.x)}, ${Math.floor(position.y)}, ${Math.floor(position.z)} ` +
-          `(pathfinder ${active ? 'active' : 'inactive'})`
-        )
+          `(pathfinder ${active ? 'active' : 'inactive'})${targetText}`
+        console.warn(message)
         controller.abort()
+        rejectFailure(new Error(message))
       }
     }, pollMs)
     timer.unref?.()

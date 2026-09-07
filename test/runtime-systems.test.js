@@ -25,6 +25,7 @@ const { installToolCompatibility, safeEnchantments } = require('../src/controlle
 const { LandmarkStore } = require('../src/controller/landmark-store')
 const { BlueprintTask } = require('../src/tasks/blueprint-task')
 const { BotController } = require('../src/controller/bot-controller')
+const { itemForBlock } = require('../scripts/convert-schem')
 
 test('validates and counts the starter home blueprint', () => {
   const loader = new BlueprintLoader(path.resolve(__dirname, '../schematics'))
@@ -40,6 +41,114 @@ test('blueprint materials count stacked decorative block items', () => {
   assert.equal(materials.sea_pickle, 3)
   assert.equal(materials.turtle_egg, 4)
   assert.equal(materials.wildflowers, 8)
+  assert.ok(materials.mangrove_slab >= 2)
+})
+
+test('blueprint double slabs consume two slab items', () => {
+  const loader = new BlueprintLoader('.')
+  assert.equal(loader.itemCount({
+    block: 'mangrove_slab', properties: { type: 'double' }
+  }), 2)
+})
+
+test('blueprint materials count one item for two-block doors and beds', () => {
+  const loader = new BlueprintLoader('.')
+  const blueprint = {
+    layers: [
+      { y: 0, rows: ['DB'] },
+      { y: 1, rows: ['D.'] }
+    ],
+    palette: {
+      '.': 'air',
+      D: { block: 'oak_door', properties: { half: 'lower' } },
+      B: { block: 'green_bed', properties: { part: 'foot', facing: 'east' } }
+    }
+  }
+  // Represent the generated halves explicitly, as a converted .schem does.
+  blueprint.layers[1].rows[0] = 'UH'
+  blueprint.palette.U = { block: 'oak_door', properties: { half: 'upper' } }
+  blueprint.palette.H = { block: 'green_bed', properties: { part: 'head', facing: 'east' } }
+  assert.deepEqual(loader.materials(blueprint), { oak_door: 1, green_bed: 1 })
+})
+
+test('blueprint placement orders door and bed owner halves before generated halves', () => {
+  const task = new BlueprintTask({}, {}, {})
+  assert.ok(task.buildPlacementRank({ block: 'oak_door', properties: { half: 'lower' } }) <
+    task.buildPlacementRank({ block: 'oak_door', properties: { half: 'upper' } }))
+  assert.ok(task.buildPlacementRank({ block: 'green_bed', properties: { part: 'foot' } }) <
+    task.buildPlacementRank({ block: 'green_bed', properties: { part: 'head' } }))
+})
+
+test('schematic repair rebuilds a missing generated bed half from the foot', () => {
+  const foot = new Vec3(4, 64, 7)
+  const head = foot.offset(1, 0, 0)
+  const task = new BlueprintTask({
+    blockAt: (position) => position.equals(foot)
+      ? { name: 'green_bed', getProperties: () => ({ facing: 'east', part: 'foot' }) }
+      : { name: 'air', boundingBox: 'empty', getProperties: () => ({}) }
+  }, {}, {})
+  const pending = task.pendingPlacements([
+    { position: foot, x: 0, y: 0, z: 0, block: 'green_bed', material: 'green_bed', properties: { facing: 'east', part: 'foot' } },
+    { position: head, x: 1, y: 0, z: 0, block: 'green_bed', material: 'green_bed', properties: { facing: 'east', part: 'head' } }
+  ])
+  assert.equal(pending.length, 1)
+  assert.equal(pending[0].position.toString(), foot.toString())
+  assert.equal(pending[0].repairCoupled, true)
+  assert.equal(pending[0].progressCredit, 1)
+  assert.deepEqual(pending[0].coupledPositions.map(String), [head.toString()])
+})
+
+test('schematic repair rebuilds a missing upper door from the lower half', () => {
+  const lower = new Vec3(2, 70, 3)
+  const upper = lower.offset(0, 1, 0)
+  const task = new BlueprintTask({
+    blockAt: (position) => position.equals(lower)
+      ? { name: 'oak_door', getProperties: () => ({ facing: 'south', half: 'lower' }) }
+      : { name: 'air', boundingBox: 'empty', getProperties: () => ({}) }
+  }, {}, {})
+  const pending = task.pendingPlacements([
+    { position: lower, x: 0, y: 0, z: 0, block: 'oak_door', material: 'oak_door', properties: { facing: 'south', half: 'lower' } },
+    { position: upper, x: 0, y: 1, z: 0, block: 'oak_door', material: 'oak_door', properties: { facing: 'south', half: 'upper' } }
+  ])
+  assert.equal(pending.length, 1)
+  assert.equal(pending[0].position.toString(), lower.toString())
+  assert.deepEqual(pending[0].coupledPositions.map(String), [upper.toString()])
+})
+
+test('schematic construction defers a block intersecting the bot body', () => {
+  const feet = new Vec3(2, 64, 2)
+  const head = feet.offset(0, 1, 0)
+  const other = new Vec3(3, 65, 2)
+  const task = new BlueprintTask({
+    entity: { position: feet.clone() },
+    blockAt: (position) => ({ name: 'air', boundingBox: 'empty', position, getProperties: () => ({}) })
+  }, {}, {})
+  const pending = task.pendingPlacements([
+    { position: head, x: 0, y: 1, z: 0, block: 'glass_pane', material: 'glass_pane' },
+    { position: other, x: 1, y: 1, z: 0, block: 'glass_pane', material: 'glass_pane' }
+  ])
+  assert.equal(pending[0].position.toString(), other.toString())
+  assert.equal(pending[1].position.toString(), head.toString())
+})
+
+test('blueprint bed matching verifies head and foot state', () => {
+  const task = new BlueprintTask({}, {}, {})
+  const block = {
+    name: 'green_bed',
+    getProperties: () => ({ facing: 'east', part: 'head' })
+  }
+  assert.equal(task.matchesEntry(block, {
+    block: 'green_bed', material: 'green_bed', properties: { facing: 'east', part: 'foot' }
+  }), false)
+})
+
+test('schematic conversion resolves inventory items for wall-mounted variants', () => {
+  assert.equal(itemForBlock('white_wall_banner'), 'white_banner')
+  assert.equal(itemForBlock('oak_wall_sign'), 'oak_sign')
+  assert.equal(itemForBlock('spruce_wall_hanging_sign'), 'spruce_hanging_sign')
+  assert.equal(itemForBlock('skeleton_wall_skull'), 'skeleton_skull')
+  assert.equal(itemForBlock('zombie_wall_head'), 'zombie_head')
+  assert.equal(itemForBlock('soul_wall_torch'), 'soul_torch')
 })
 
 test('block tracker caches scans and cools down unreachable targets', () => {
@@ -550,6 +659,24 @@ test('schematic site survey rotates at the requested anchor before moving away',
   )
 })
 
+test('resumed schematic accepts a safe stance inside completed walls', async () => {
+  const blueprint = { size: { x: 8, y: 12, z: 8 }, anchor: { x: 0, y: 0, z: 0 } }
+  const current = new Vec3(4, 69, 4)
+  let moved = false
+  const task = new BlueprintTask({
+    entity: { position: current },
+    blockAt: () => ({ name: 'air', boundingBox: 'empty' })
+  }, {
+    canStandAt: (position) => position.equals(current),
+    gotoBounded: async () => { moved = true }
+  }, {})
+  const result = await task.walkToBuildSite(
+    { x: 0, y: 64, z: 0, facing: 'south' }, blueprint, new AbortController().signal, true
+  )
+  assert.deepEqual(result, current)
+  assert.equal(moved, false)
+})
+
 test('schematic wall blocks choose their wall support and verify the resulting state', async () => {
   const target = new Vec3(0, 64, 0)
   let placed = false
@@ -624,7 +751,7 @@ test('directional schematic blocks can use an elevated stance above the foundati
     type: 'place', block: 'spruce_stairs', expectedBlock: 'spruce_stairs', verifyState: true,
     x: 0, y: 64, z: 0, properties: { facing: 'north' }
   }, new AbortController().signal)
-  assert.deepEqual(stance, new Vec3(0, 65, -2))
+  assert.deepEqual(stance, new Vec3(0, 65, 2))
   assert.equal(looked, true)
   assert.equal(forcedLook, true)
   assert.equal(placementOptions.forceLook, 'ignore')
@@ -656,7 +783,7 @@ test('directional schematic blocks use explicit yaw when their canonical stance 
     type: 'place', block: 'stone_brick_stairs', expectedBlock: 'stone_brick_stairs', verifyState: true,
     x: 0, y: 65, z: 0, properties: { facing: 'east', half: 'bottom' }
   }, new AbortController().signal)
-  assert.ok(lookedAt.x < start.x - 3)
+  assert.ok(lookedAt.x > start.x + 3)
   assert.equal(placed, true)
 })
 
@@ -887,6 +1014,35 @@ test('schematic placement stacks candles to the requested count', async () => {
   assert.equal(candles, 3)
 })
 
+test('schematic placement merges two slab items for a requested double slab', async () => {
+  const target = new Vec3(0, 64, 0)
+  let placed = false
+  let type = 'bottom'
+  let activations = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => false
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, -2) },
+    inventory: { items: () => [{ name: 'mangrove_slab', type: 1, count: 2 }] },
+    blockAt: (position) => position.equals(target)
+      ? (placed
+          ? { name: 'mangrove_slab', boundingBox: 'block', position, getProperties: () => ({ type }) }
+          : { name: 'air', boundingBox: 'empty', position })
+      : { name: 'stone', boundingBox: 'block', position },
+    equip: async () => {},
+    activateBlock: async () => { activations += 1; type = 'double' },
+    _placeBlockWithOptions: async () => { placed = true }
+  }
+  await executor.place({
+    type: 'place', block: 'mangrove_slab', expectedBlock: 'mangrove_slab', verifyState: true,
+    x: 0, y: 64, z: 0, properties: { type: 'double' }
+  }, new AbortController().signal)
+  assert.equal(activations, 1)
+  assert.equal(type, 'double')
+})
+
 test('schematic placement repairs one server-side state mismatch locally', async () => {
   const target = new Vec3(0, 64, 0)
   let state = 'air'
@@ -1062,6 +1218,72 @@ test('schematic placement steps out of its own target cell', async () => {
   assert.equal(placed, true)
 })
 
+test('schematic placement verifies interaction reach after navigation', async () => {
+  const target = new Vec3(8, 65, 0)
+  let placed = false
+  let moved = false
+  let cancelledPath = false
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => false
+  executor.gotoBounded = async () => {
+    moved = true
+    executor.bot.entity.position = new Vec3(6, 64, 0)
+  }
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, 0) },
+    pathfinder: { setGoal: (goal) => { if (goal === null) cancelledPath = true } },
+    inventory: { items: () => [{ name: 'stone', type: 1, count: 1 }] },
+    blockAt: (position) => position.equals(target)
+      ? (placed
+          ? { name: 'stone', boundingBox: 'block', position, getProperties: () => ({}) }
+          : { name: 'air', boundingBox: 'empty', position })
+      : { name: 'stone', boundingBox: 'block', position },
+    equip: async () => {},
+    _placeBlockWithOptions: async () => { placed = true }
+  }
+  await executor.place({
+    type: 'place', block: 'stone', expectedBlock: 'stone', x: target.x, y: target.y, z: target.z
+  }, new AbortController().signal)
+  assert.equal(moved, true)
+  assert.equal(cancelledPath, true)
+  assert.equal(placed, true)
+})
+
+test('schematic placement falls back to an exact reachable stance after a false goal completion', async () => {
+  const target = new Vec3(8, 65, 0)
+  const exactStance = new Vec3(7, 65, 0)
+  let placed = false
+  let moves = 0
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = (position) => position.equals(exactStance)
+  executor.gotoBounded = async (goal) => {
+    moves += 1
+    if (goal.x === 7 && goal.y === 65 && goal.z === 0) executor.bot.entity.position = new Vec3(7, 65, 0)
+  }
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, 0) },
+    inventory: { items: () => [{ name: 'stone', type: 1, count: 1 }] },
+    blockAt: (position) => position.equals(target)
+      ? (placed
+          ? { name: 'stone', boundingBox: 'block', position, getProperties: () => ({}) }
+          : { name: 'air', boundingBox: 'empty', position })
+      : (position.equals(exactStance) || position.equals(exactStance.offset(0, 1, 0)))
+          ? { name: 'air', boundingBox: 'empty', position }
+      : { name: 'stone', boundingBox: 'block', position },
+    equip: async () => {},
+    _placeBlockWithOptions: async () => { placed = true }
+  }
+  await executor.place({
+    type: 'place', block: 'stone', expectedBlock: 'stone', x: target.x, y: target.y, z: target.z
+  }, new AbortController().signal)
+  assert.ok(moves >= 2)
+  assert.equal(placed, true)
+})
+
 test('schematic placement verifies escape movement before placing', async () => {
   const target = new Vec3(0, 64, 0)
   let placed = false
@@ -1136,6 +1358,93 @@ test('floating schematic blocks create and register temporary support', async ()
   assert.equal(targetPlaced, true)
 })
 
+test('floating schematic support grows a bounded column from solid ground', async () => {
+  const top = new Vec3(0, 67, 0)
+  const placed = new Set()
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    blockAt: (position) => ({
+      name: position.y <= 64 || placed.has(position.toString()) ? 'stone' : 'air',
+      boundingBox: position.y <= 64 || placed.has(position.toString()) ? 'block' : 'empty',
+      position
+    })
+  }
+  executor.isPassable = (block) => block.boundingBox === 'empty'
+  executor.isLiquid = () => false
+  executor.repairStairFloor = async (position) => {
+    const neighbors = [
+      position.offset(0, -1, 0), position.offset(0, 1, 0),
+      position.offset(1, 0, 0), position.offset(-1, 0, 0),
+      position.offset(0, 0, 1), position.offset(0, 0, -1)
+    ]
+    if (!neighbors.some((neighbor) => executor.bot.blockAt(neighbor).boundingBox !== 'empty')) {
+      throw new Error(`no solid face available to repair staircase at ${position}`)
+    }
+    placed.add(position.toString())
+    return true
+  }
+  const created = await executor.createPlacementSupport(top, new AbortController().signal)
+  assert.deepEqual(created.map((position) => position.y), [65, 66, 67])
+})
+
+test('floating schematic support restocks when its scaffold stack is exhausted', async () => {
+  const target = new Vec3(0, 65, 0)
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    blockAt: (position) => ({ name: 'air', boundingBox: 'empty', position })
+  }
+  executor.isPassable = () => true
+  executor.isLiquid = () => false
+  let attempts = 0
+  let restocks = 0
+  executor.repairStairFloor = async () => {
+    attempts += 1
+    if (attempts === 1) throw new Error(`cannot repair staircase at ${target}; no dirt or stone blocks`)
+    return true
+  }
+  executor.ensurePlacementScaffold = async (_signal, preserveItem) => {
+    assert.equal(preserveItem, 'spruce_leaves')
+    restocks += 1
+    return { name: 'cobbled_deepslate', count: 16 }
+  }
+  const created = await executor.createPlacementSupport(
+    target, new AbortController().signal, 'spruce_leaves'
+  )
+  assert.equal(restocks, 1)
+  assert.deepEqual(created.map(String), [target.toString()])
+})
+
+test('building creates a tracked temporary staircase to a sealed upper placement stance', async () => {
+  const start = new Vec3(0, 64, 0)
+  const stance = new Vec3(3, 67, 0)
+  const solid = new Set()
+  const tracked = []
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    entity: { position: start.clone() },
+    blockAt: (position) => ({
+      name: solid.has(position.toString()) ? 'cobblestone' : 'air',
+      boundingBox: solid.has(position.toString()) ? 'block' : 'empty',
+      position
+    })
+  }
+  executor.isPassable = (block) => block.boundingBox === 'empty'
+  executor.isLiquid = () => false
+  executor.createPlacementSupport = async (position) => {
+    solid.add(position.toString())
+    return [position.clone()]
+  }
+  executor.gotoBounded = async (goal) => {
+    executor.bot.entity.position = new Vec3(goal.x, goal.y, goal.z)
+  }
+  const climbed = await executor.createPlacementStaircase(
+    stance, new AbortController().signal, 'smooth_sandstone',
+    (position) => tracked.push(position.toString())
+  )
+  assert.equal(climbed, true)
+  assert.deepEqual(tracked, ['(1, 64, 0)', '(2, 65, 0)', '(3, 66, 0)'])
+})
+
 test('construction restocks scaffold blocks before placing floating blocks', async () => {
   const items = []
   const requested = []
@@ -1151,6 +1460,17 @@ test('construction restocks scaffold blocks before placing floating blocks', asy
   const scaffold = await executor.ensurePlacementScaffold(new AbortController().signal, 'spruce_leaves')
   assert.equal(scaffold.name, 'cobbled_deepslate')
   assert.deepEqual(requested, [{ name: 'cobbled_deepslate', quantity: 16 }])
+})
+
+test('construction falls back to safe stone variants for scaffolding', () => {
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    inventory: { items: () => [
+      { name: 'smooth_sandstone', count: 32 },
+      { name: 'andesite', count: 8 }
+    ] }
+  }
+  assert.equal(executor.scaffoldItem().name, 'andesite')
 })
 
 test('vertical schematic logs refuse horizontal support and scaffold below', async () => {
@@ -1339,6 +1659,8 @@ test('classifies routine failures and retries safe navigation once', async () =>
   assert.equal(classifyFailure(new Error('Took too long to decide path to goal')), 'navigation')
   assert.equal(classifyFailure(new Error('build site is obstructed by stone')), 'unsafe_or_blocked')
   assert.equal(classifyFailure(new Error('no usable pickaxe or replacement materials')), 'missing_resource')
+  assert.equal(classifyFailure(new Error('Event blockUpdate:(1, 2, 3) did not fire within timeout')), 'transient_world')
+  assert.equal(classifyFailure(new Error('schematic placement mismatch: type=double instead of bottom')), 'transient_world')
   const bot = {
     entity: { position: new Vec3(0, 64, 0) },
     pathfinder: { isMoving: () => false, isMining: () => false, isBuilding: () => false }
@@ -1363,6 +1685,29 @@ test('classifies routine failures and retries safe navigation once', async () =>
   assert.equal(result, 'arrived')
   assert.equal(attempts, 2)
   assert.equal(recoveries, 1)
+})
+
+test('schematic builds retry transient placement loss locally without AI replanning', async () => {
+  const bot = {
+    entity: { position: new Vec3(0, 64, 0) },
+    pathfinder: { isMoving: () => false, isMining: () => false, isBuilding: () => false }
+  }
+  const manager = new RecoveryManager(bot, {}, { stallMs: 5000 })
+  const task = new Task('action', 'build test')
+  task.start()
+  let attempts = 0
+  const result = await manager.run(
+    { type: 'build_schematic' },
+    new AbortController().signal,
+    task,
+    async () => {
+      attempts += 1
+      if (attempts < 3) throw new Error('Event blockUpdate:(1, 2, 3) did not fire within timeout of 5000ms')
+      return 'continued build'
+    }
+  )
+  assert.equal(result, 'continued build')
+  assert.equal(attempts, 3)
 })
 
 test('recovery preserves a skill-provided failure category', async () => {
@@ -1442,7 +1787,7 @@ test('starting foreground work waits for aborted background maintenance to settl
   assert.equal(settled, true)
 })
 
-test('watchdog aborts a plugin promise that hangs after movement stops', async () => {
+test('watchdog escapes a plugin promise that ignores cancellation after movement stops', async () => {
   class Bot extends EventEmitter {}
   const bot = new Bot()
   bot.entity = { position: new Vec3(0, 64, 0) }
@@ -1459,21 +1804,41 @@ test('watchdog aborts a plugin promise that hangs after movement stops', async (
     { type: 'move_to' },
     new AbortController().signal,
     task,
-    async (signal) => {
+    async () => {
       attempts += 1
       if (attempts > 1) return 'arrived after watchdog recovery'
-      await new Promise((resolve, reject) => {
-        signal.addEventListener('abort', () => {
-          const error = new Error('plugin operation cancelled')
-          error.name = 'AbortError'
-          reject(error)
-        }, { once: true })
-      })
+      await new Promise(() => {})
     }
   )
   assert.equal(result, 'arrived after watchdog recovery')
   assert.equal(attempts, 2)
   assert.equal(recoveries, 1)
+})
+
+test('navigation retry escapes a recovery path that also ignores cancellation', async () => {
+  class Bot extends EventEmitter {}
+  const bot = new Bot()
+  bot.entity = { position: new Vec3(0, 64, 0) }
+  bot.inventory = new EventEmitter()
+  bot.pathfinder = { isMoving: () => false, isMining: () => false, isBuilding: () => false }
+  let attempts = 0
+  let stopped = 0
+  const manager = new RecoveryManager(bot, {
+    stop: () => { stopped += 1 },
+    recoverStuck: async () => new Promise(() => {})
+  }, { stallMs: 30 })
+  const task = new Task('action', 'move')
+  task.start()
+  const result = await manager.run(
+    { type: 'move_to' }, new AbortController().signal, task,
+    async () => {
+      attempts += 1
+      if (attempts === 1) throw new Error('No path to target')
+      return 'retried after recovery timeout'
+    }
+  )
+  assert.equal(result, 'retried after recovery timeout')
+  assert.equal(stopped, 1)
 })
 
 test('inventory and entity trackers maintain queryable local state', () => {
