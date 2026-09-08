@@ -24,9 +24,136 @@ const { EventMonitor, nearestThreat, suffocatingBlock } = require('../src/contro
 const { installToolCompatibility, safeEnchantments } = require('../src/controller/tool-compatibility')
 const { LandmarkStore } = require('../src/controller/landmark-store')
 const {
-  BlueprintTask, isDeferrableBuildNavigation, nearDeferredBuildPocket
+  BlueprintTask, isDeferrableBuildNavigation, isDeferrableBuildPlacement,
+  nearDeferredBuildPocket
 } = require('../src/tasks/blueprint-task')
 const { BotController } = require('../src/controller/bot-controller')
+
+test('build access failures allow another route without swallowing cancellation or programming errors', async () => {
+  const executor = Object.create(ActionExecutor.prototype)
+  const signal = new AbortController().signal
+  const failures = []
+  const missing = new Error('cannot repair staircase; no dirt or stone blocks')
+  assert.equal(await executor.tryBuildAccessRoute(async () => { throw missing }, signal, failures), false)
+  assert.deepEqual(failures, [missing])
+  assert.equal(await executor.tryBuildAccessRoute(async () => true, signal, failures), true)
+  await assert.rejects(executor.tryBuildAccessRoute(async () => { throw new TypeError('bug') }, signal, failures), /bug/)
+  const cancelled = new AbortController()
+  cancelled.abort()
+  await assert.rejects(executor.tryBuildAccessRoute(async () => true, cancelled.signal, failures), { name: 'AbortError' })
+})
+
+test('access route survey rejects a distant wall before constructing or moving', async () => {
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    entity: { position: new Vec3(0, 64, 0) },
+    blockAt: (position) => ({
+      name: position.x === 3 ? 'stone' : 'air',
+      boundingBox: position.x === 3 ? 'block' : 'empty'
+    })
+  }
+  executor.createPlacementSupport = async () => assert.fail('must survey before placing supports')
+  executor.gotoBounded = async () => assert.fail('must survey before moving')
+  const signal = new AbortController().signal
+  assert.equal(await executor.createPlacementStaircase(new Vec3(4, 68, 0), signal), false)
+  assert.equal(await executor.createPlacementWalkway(new Vec3(4, 64, 0), signal), false)
+  executor.bot.blockAt = () => null
+  assert.equal(executor.buildAccessRouteIsClear([new Vec3(1, 64, 0)]), false)
+})
+
+test('blueprint verification repairs improving builds without AI and stops unchanged retries', async () => {
+  const task = Object.create(BlueprintTask.prototype)
+  let calls = 0
+  task.executor = { blockTracker: { clearUnreachable() {} } }
+  task.audit = () => ({ blocks: Array(10), alreadyPlaced: 8 })
+  task.buildPass = async () => {
+    calls += 1
+    throw Object.assign(new Error('still missing'), { category: 'build_incomplete' })
+  }
+  await assert.rejects(task.build({}, new AbortController().signal, {}), /still missing/)
+  assert.equal(calls, 2)
+  calls = 0
+  task.audit = () => ({ blocks: Array(10), alreadyPlaced: 7 + calls })
+  task.buildPass = async () => {
+    calls += 1
+    if (calls === 3) return 'verified complete'
+    throw Object.assign(new Error('still missing'), { category: 'build_incomplete' })
+  }
+  assert.equal(await task.build({}, new AbortController().signal, {}), 'verified complete')
+  assert.equal(calls, 3)
+})
+
+test('cleanup audit protects schematic stone and keeps unloaded tracked supports', () => {
+  const owned = new Vec3(0, 5, 0)
+  const unknown = new Vec3(2, 8, 0)
+  const removed = new Vec3(2, 4, 0)
+  const scaffolds = new Map([owned, unknown, removed].map((p) => [p.toString(), p]))
+  const task = new BlueprintTask({ blockAt: (p) => p.equals(unknown) ? null :
+    { name: p.equals(owned) ? 'stone' : 'air' } }, {}, {})
+  const protect = task.auditScaffoldCleanup([{ position: owned, material: 'stone' }], scaffolds)
+  assert.equal(protect(owned), true)
+  assert.deepEqual([...scaffolds.keys()], [unknown.toString()])
+})
+
+test('strict scaffold cleanup removes high blocks first and preserves lower access when blocked', async () => {
+  const executor = Object.create(ActionExecutor.prototype)
+  const high = new Vec3(2, 10, 0), blocked = new Vec3(3, 9, 0), low = new Vec3(2, 8, 0)
+  const scaffolds = new Map([low, blocked, high].map((p) => [p.toString(), p]))
+  const world = new Map([...scaffolds.values()].map((p) => [p.toString(), { name: 'cobblestone', position: p }]))
+  const movements = () => ({ canDig: true, allow1by1towers: true, scafoldingBlocks: [1] })
+  executor.bot = {
+    blockAt: (p) => world.get(p.toString()),
+    pathfinder: { movements: movements() }, collectBlock: { movements: movements() }
+  }
+  executor.ensureCollectBlockSlot = async () => {}
+  const attempted = []
+  executor.collectBlockBounded = async (block) => {
+    attempted.push(block.position.y)
+    assert.equal(executor.bot.pathfinder.movements.canDig, false)
+    assert.equal(executor.bot.collectBlock.movements.allow1by1towers, false)
+    assert.deepEqual(executor.bot.pathfinder.movements.scafoldingBlocks, [])
+    if (block.position.equals(blocked)) throw new Error('No path')
+    world.set(block.position.toString(), { name: 'air' })
+  }
+  await executor.returnFromTreeAndRecoverScaffolds(null, scaffolds, new AbortController().signal, { strictTopDown: true })
+  assert.deepEqual(attempted, [10, 9])
+  assert.equal(scaffolds.has(low.toString()), true)
+  assert.equal(executor.bot.pathfinder.movements.canDig, true)
+  assert.deepEqual(executor.bot.pathfinder.movements.scafoldingBlocks, [1])
+})
+
+test('navigation rejects empty-path false success before downstream actions run', async () => {
+  const { goals } = require('mineflayer-pathfinder')
+  const executor = Object.create(ActionExecutor.prototype)
+  let cleared = false
+  const movements = { canDig: true, clearCollisionIndex() {} }
+  executor.bot = {
+    entity: { position: new Vec3(23.5, 96.5, -153.5) },
+    pathfinder: {
+      searchRadius: 32, movements,
+      goto: async () => {},
+      setGoal: (goal) => { cleared = goal === null }
+    }
+  }
+  await assert.rejects(executor.gotoBounded(
+    new goals.GoalBlock(4, 88, -153), new AbortController().signal, 16
+  ), /navigation returned before arrival/)
+  assert.equal(cleared, true)
+  assert.equal(movements.canDig, true)
+  assert.equal(executor.bot.pathfinder.searchRadius, 32)
+  await executor.gotoBounded(
+    new goals.GoalBlock(23, 96, -154), new AbortController().signal, 16
+  )
+})
+
+test('manual scaffold tower refuses an occupied slab cell before jumping or placing', async () => {
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.bot = {
+    entity: { position: new Vec3(0.5, 64.5, 0.5) },
+    blockAt: (position) => ({ name: position.y === 64 ? 'oak_slab' : 'stone', boundingBox: 'block' })
+  }
+  await assert.rejects(executor.manualScaffoldTower(66, new AbortController().signal), /empty column/)
+})
 const { itemForBlock } = require('../scripts/convert-schem')
 
 test('validates and counts the starter home blueprint', () => {
@@ -131,6 +258,50 @@ test('schematic construction defers a block intersecting the bot body', () => {
   ])
   assert.equal(pending[0].position.toString(), other.toString())
   assert.equal(pending[1].position.toString(), head.toString())
+})
+
+test('schematic construction installs required fixtures floor by floor and leaves decor last', () => {
+  const task = new BlueprintTask({
+    entity: { position: new Vec3(20, 64, 20) },
+    blockAt: (position) => ({ name: 'air', boundingBox: 'empty', position, getProperties: () => ({}) })
+  }, {}, {})
+  const pending = task.pendingPlacements([
+    { position: new Vec3(0, 66, 0), x: 0, y: 2, z: 0, material: 'spruce_planks' },
+    { position: new Vec3(0, 64, 0), x: 0, y: 0, z: 0, material: 'stone_bricks' },
+    { position: new Vec3(1, 64, 0), x: 1, y: 0, z: 0, material: 'oak_door', properties: { half: 'lower' } },
+    { position: new Vec3(2, 64, 0), x: 2, y: 0, z: 0, material: 'green_carpet' }
+  ])
+  assert.deepEqual(pending.map((entry) => entry.material), [
+    'stone_bricks', 'oak_door', 'spruce_planks', 'green_carpet'
+  ])
+})
+
+test('resumed schematic construction finishes the current floor before distant floors', () => {
+  const task = new BlueprintTask({
+    entity: { position: new Vec3(20, 70, 20) },
+    blockAt: (position) => ({ name: 'air', boundingBox: 'empty', position, getProperties: () => ({}) })
+  }, {}, {})
+  const pending = task.pendingPlacements([
+    { position: new Vec3(0, 64, 0), x: 0, y: 0, z: 0, material: 'stone_bricks' },
+    { position: new Vec3(0, 70, 0), x: 0, y: 6, z: 0, material: 'spruce_planks' },
+    { position: new Vec3(0, 69, 0), x: 0, y: 5, z: 0, material: 'dark_oak_planks' },
+    { position: new Vec3(0, 71, 0), x: 0, y: 7, z: 0, material: 'oak_planks' }
+  ], 70)
+  assert.deepEqual(pending.map(({ position }) => position.y), [70, 69, 71, 64])
+})
+
+test('schematic construction sweeps alternate rows instead of crossing the footprint repeatedly', () => {
+  const task = new BlueprintTask({
+    entity: { position: new Vec3(20, 64, 20) },
+    blockAt: (position) => ({ name: 'air', boundingBox: 'empty', position, getProperties: () => ({}) })
+  }, {}, {})
+  const entries = [
+    new Vec3(2, 64, 1), new Vec3(0, 64, 0),
+    new Vec3(0, 64, 1), new Vec3(2, 64, 0)
+  ].map((position) => ({ position, x: position.x, y: 0, z: position.z, material: 'stone_bricks' }))
+  assert.deepEqual(task.pendingPlacements(entries).map(({ position }) => [position.x, position.z]), [
+    [0, 0], [2, 0], [2, 1], [0, 1]
+  ])
 })
 
 test('blueprint bed matching verifies head and foot state', () => {
@@ -391,6 +562,13 @@ test('schematic builds recognize and resume an incomplete saved site', () => {
     { x: resumed.x, y: resumed.y, z: resumed.z, facing: resumed.facing },
     { x: 10, y: 64, z: 20, facing: 'south' }
   )
+  // A deleted house's dirt foundation is not evidence of a resumable house.
+  blueprint.blocks = blueprint.blocks.map((entry) => ({ ...entry, material: 'dirt' }))
+  bot.blockAt = () => ({ name: 'dirt', boundingBox: 'block', getProperties: () => ({}) })
+  blueprint.blocks.push({ x: 4, y: 1, z: 0, material: 'spruce_planks' })
+  assert.equal(task.savedPartialBuild({
+    type: 'build_schematic', schematic: 'test', x: 0, y: 64, z: 0
+  }, blueprint), null)
 })
 
 test('large schematic construction withdraws one supply stack when carried material runs out', async () => {
@@ -716,6 +894,38 @@ test('schematic wall blocks choose their wall support and verify the resulting s
   }, new AbortController().signal)
   assert.deepEqual(usedFace, new Vec3(1, 0, 0))
   assert.equal(usedOptions.forceLook, true)
+})
+
+test('schematic wall buttons click the requested wall instead of the floor', async () => {
+  const target = new Vec3(0, 64, 0)
+  let placed = false
+  let usedFace = null
+  const executor = Object.create(ActionExecutor.prototype)
+  executor.limits = { maxMoveDistance: 64 }
+  executor.assertNearby = () => {}
+  executor.canStandAt = () => true
+  executor.gotoBounded = async () => {}
+  executor.bot = {
+    entity: { position: new Vec3(-2, 64, 0) },
+    inventory: { items: () => [{ name: 'spruce_button', type: 1, count: 1 }] },
+    blockAt: (position) => {
+      if (position.equals(target)) return placed
+        ? {
+            name: 'spruce_button', boundingBox: 'empty', position,
+            getProperties: () => ({ face: 'wall', facing: 'east', powered: false })
+          }
+        : { name: 'air', boundingBox: 'empty', position }
+      return { name: 'stone', boundingBox: 'block', position }
+    },
+    equip: async () => {},
+    lookAt: async () => {},
+    _placeBlockWithOptions: async (reference, face) => { usedFace = face; placed = true }
+  }
+  await executor.place({
+    type: 'place', block: 'spruce_button', expectedBlock: 'spruce_button', verifyState: true,
+    x: 0, y: 64, z: 0, properties: { face: 'wall', facing: 'east' }
+  }, new AbortController().signal)
+  assert.deepEqual(usedFace, new Vec3(1, 0, 0))
 })
 
 test('directional schematic blocks can use an elevated stance above the foundation', async () => {
@@ -1628,7 +1838,20 @@ test('building defers inaccessible placements but not missing materials', () => 
     new Error('no player-reachable placement stance for spruce_trapdoor at (1, 2, 3)')
   ), true)
   assert.equal(isDeferrableBuildNavigation(new Error('No path to the goal!')), true)
+  assert.equal(isDeferrableBuildNavigation(
+    new Error('scaffold placement failed: cannot reach staircase break at (1, 2, 3)')
+  ), true)
+  assert.equal(isDeferrableBuildNavigation(
+    new Error('cannot clear build obstruction at (1, 2, 3)')
+  ), true)
   assert.equal(isDeferrableBuildNavigation(new Error('missing build supply spruce_trapdoor')), false)
+  assert.equal(isDeferrableBuildPlacement(
+    new Error('Event blockUpdate:(1, 2, 3) did not fire within timeout of 5000ms')
+  ), true)
+  assert.equal(isDeferrableBuildPlacement(
+    new Error('schematic placement mismatch at (1, 2, 3): facing=north instead of south')
+  ), true)
+  assert.equal(isDeferrableBuildPlacement(new Error('missing build supply spruce_trapdoor')), false)
 })
 
 test('building groups nearby inaccessible details without crossing phases or floors', () => {
@@ -1648,15 +1871,15 @@ test('construction restocks scaffold blocks before placing floating blocks', asy
   executor.inventoryPolicy = { freeTrashSlots: async () => 0 }
   executor.tryWithdrawFromNearby = async (name, quantity) => {
     requested.push({ name, quantity })
-    if (name === 'cobbled_deepslate') items.push({ name, count: quantity })
-    return name === 'cobbled_deepslate' ? quantity : 0
+    if (name === 'cobblestone') items.push({ name, count: quantity })
+    return name === 'cobblestone' ? quantity : 0
   }
   const scaffold = await executor.ensurePlacementScaffold(new AbortController().signal, 'spruce_leaves')
-  assert.equal(scaffold.name, 'cobbled_deepslate')
-  assert.deepEqual(requested, [{ name: 'cobbled_deepslate', quantity: 64 }])
+  assert.equal(scaffold.name, 'cobblestone')
+  assert.deepEqual(requested, [{ name: 'cobblestone', quantity: 64 }])
 })
 
-test('construction falls back to safe stone variants for scaffolding', () => {
+test('construction scaffolding allows only dirt and cobblestone, never planks', () => {
   const executor = Object.create(ActionExecutor.prototype)
   executor.bot = {
     inventory: { items: () => [
@@ -1664,7 +1887,19 @@ test('construction falls back to safe stone variants for scaffolding', () => {
       { name: 'andesite', count: 8 }
     ] }
   }
-  assert.equal(executor.scaffoldItem().name, 'andesite')
+  assert.equal(executor.scaffoldItem(), null)
+  executor.bot.inventory.items = () => [{ name: 'cherry_planks', count: 8 }]
+  assert.equal(executor.scaffoldItem(), null)
+  for (const name of ['dirt', 'cobblestone']) {
+    executor.bot.inventory.items = () => [{ name, count: 8 }]
+    assert.equal(executor.scaffoldItem().name, name)
+  }
+  const { scaffoldItemIds, isRecoverableScaffold } = require('../src/controller/scaffold-policy')
+  executor.bot.registry = { itemsByName: Object.fromEntries(
+    ['dirt', 'cobblestone', 'oak_planks', 'cherry_planks', 'sandstone'].map((name, id) => [name, { name, id }])
+  ) }
+  assert.deepEqual(scaffoldItemIds(executor.bot), [0, 1])
+  assert.equal(isRecoverableScaffold('cherry_planks'), true)
 })
 
 test('build supply waiting accepts any supported scaffold material', async () => {
@@ -1673,7 +1908,7 @@ test('build supply waiting accepts any supported scaffold material', async () =>
   executor.activity = null
   executor.bot = { inventory: { items: () => items } }
   executor.ensurePlacementScaffold = async () => {
-    items.push({ name: 'tuff', count: 8 })
+    items.push({ name: 'cobblestone', count: 8 })
     return items[0]
   }
   const found = await executor.waitForBuildSupply(
@@ -2636,7 +2871,7 @@ test('staircase preflight keeps a straight heading across dry gaps when scaffold
   ])
   const executor = Object.create(ActionExecutor.prototype)
   executor.bot = {
-    inventory: { items: () => [{ name: 'cobbled_deepslate', type: 4, count: 16 }] },
+    inventory: { items: () => [{ name: 'cobblestone', type: 4, count: 16 }] },
     blockAt: (position) => gaps.has(position.toString())
       ? { name: 'air', position, boundingBox: 'empty' }
       : { name: 'deepslate', position, boundingBox: 'block', diggable: true }
@@ -3139,6 +3374,18 @@ test('open or partial transparent build blocks do not trigger suffocation recove
       name: 'acacia_trapdoor', boundingBox: 'block', transparent: true,
       position, getProperties: () => ({ open: true })
     })
+  }
+  assert.equal(suffocatingBlock(bot), null)
+})
+
+test('opaque registry metadata does not make a partial fence a suffocation block', () => {
+  const fence = {
+    name: 'spruce_fence', boundingBox: 'block', transparent: false,
+    shapes: [[0.375, 0, 0.375, 0.625, 1.5, 0.625]], position: new Vec3(1, 65, 1)
+  }
+  const bot = {
+    entity: { position: new Vec3(1, 64, 1) },
+    blockAt: () => fence
   }
   assert.equal(suffocatingBlock(bot), null)
 })

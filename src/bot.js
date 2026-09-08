@@ -11,6 +11,7 @@ const { BotController } = require('./controller/bot-controller')
 const { AutoDisposer } = require('./controller/auto-disposer')
 const { acquireProcessLock } = require('./process-lock')
 const { installToolCompatibility } = require('./controller/tool-compatibility')
+const { scaffoldItemIds } = require('./controller/scaffold-policy')
 
 const config = loadConfig()
 let releaseProcessLock
@@ -39,16 +40,22 @@ function formatError(value) {
   try { return JSON.stringify(value) } catch { return String(value) }
 }
 
+function shouldLogReconnect(attempt = reconnectAttempt) {
+  return attempt <= 3 || attempt % 10 === 0
+}
+
 function connect() {
   clearTimeout(reconnectTimer)
   clearInterval(memoryTimer)
   memoryRestarting = false
   lastHealthSignature = null
   const options = config.minecraft
-  console.log(
-    `Connecting to ${options.host}:${options.port} as ${options.username} ` +
-    `(${options.auth}, Minecraft ${options.version})...`
-  )
+  if (shouldLogReconnect()) {
+    console.log(
+      `Connecting to ${options.host}:${options.port} as ${options.username} ` +
+      `(${options.auth}, Minecraft ${options.version})...`
+    )
+  }
 
   bot = mineflayer.createBot(options)
   bot.loadPlugin(pathfinder)
@@ -60,6 +67,9 @@ function connect() {
     bot.pathfinder.searchRadius = config.limits.pathSearchRadius
     bot.collectBlock.movements.allowParkour = false
     bot.collectBlock.movements.allow1by1towers = false
+    for (const movements of [bot.pathfinder.movements, bot.collectBlock.movements]) {
+      movements.scafoldingBlocks.splice(0, movements.scafoldingBlocks.length, ...scaffoldItemIds(bot))
+    }
     bot.pathfinder.movements.canOpenDoors = true
     bot.collectBlock.movements.canOpenDoors = true
     installToolCompatibility(bot)
@@ -128,7 +138,9 @@ function connect() {
   })
 
   bot.on('kicked', (reason) => console.error(`Kicked: ${formatError(reason)}`))
-  bot.on('error', (error) => console.error(`Connection error: ${formatError(error)}`))
+  bot.on('error', (error) => {
+    if (shouldLogReconnect()) console.error(`Connection error: ${formatError(error)}`)
+  })
   bot.once('end', (reason) => {
     clearInterval(memoryTimer)
     controller?.shutdown()
@@ -137,14 +149,21 @@ function connect() {
     autoDisposer = null
     bot = null
     global.gc?.()
-    console.log(`Disconnected: ${formatError(reason)}`)
+    const reasonText = formatError(reason)
+    const routineConnectionFailure = reasonText === 'socketClosed' && reconnectAttempt > 0
+    if (!routineConnectionFailure || shouldLogReconnect()) console.log(`Disconnected: ${reasonText}`)
     if (!shuttingDown && config.autoReconnect) {
       const delay = Math.min(
         config.reconnectMaxDelayMs,
         config.reconnectDelayMs * (2 ** Math.min(reconnectAttempt, 8))
       )
       reconnectAttempt += 1
-      console.log(`Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempt})...`)
+      if (shouldLogReconnect()) {
+        const quietSuffix = reconnectAttempt === 3 ? '; logging every 10th attempt after this' : ''
+        console.log(
+          `Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempt}${quietSuffix})...`
+        )
+      }
       reconnectTimer = setTimeout(connect, delay)
     }
   })

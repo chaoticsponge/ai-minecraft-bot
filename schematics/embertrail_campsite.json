@@ -1,0 +1,834 @@
+{
+  "format": "mineflayer-blueprint-v2",
+  "name": "embertrail_campsite",
+  "description": "Converted from embertrail-campsite.schem",
+  "size": {
+    "x": 17,
+    "y": 7,
+    "z": 17
+  },
+  "anchor": {
+    "x": 8,
+    "y": 0,
+    "z": 0,
+    "description": "Front-center ground block"
+  },
+  "palette": {
+    ".": "air",
+    "": {
+      "block": "stone"
+    },
+    "": {
+      "block": "coarse_dirt"
+    },
+    "": {
+      "block": "sea_pickle",
+      "properties": {
+        "pickles": "1",
+        "waterlogged": "true"
+      }
+    },
+    "": {
+      "block": "grass_block",
+      "properties": {
+        "snowy": "false"
+      }
+    },
+    "": {
+      "block": "podzol",
+      "properties": {
+        "snowy": "false"
+      }
+    },
+    "": {
+      "block": "oak_planks"
+    },
+    "": {
+      "block": "red_bed",
+      "properties": {
+        "facing": "north",
+        "occupied": "false",
+        "part": "head"
+      }
+    },
+    "": {
+      "block": "red_bed",
+      "properties": {
+        "facing": "north",
+        "occupied": "false",
+        "part": "foot"
+      }
+    },
+    "": {
+      "block": "oak_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "outer_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "outer_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dirt"
+    },
+    "": {
+      "block": "dirt_path"
+    },
+    "": {
+      "block": "oak_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "outer_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "red_bed",
+      "properties": {
+        "facing": "east",
+        "occupied": "false",
+        "part": "foot"
+      }
+    },
+    "": {
+      "block": "red_bed",
+      "properties": {
+        "facing": "east",
+        "occupied": "false",
+        "part": "head"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "outer_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cobblestone_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "sea_pickle",
+      "properties": {
+        "pickles": "2",
+        "waterlogged": "true"
+      }
+    },
+    "": {
+      "block": "oak_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "moss_carpet"
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "white_wool"
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "chest",
+      "properties": {
+        "facing": "south",
+        "type": "single",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "crafting_table"
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "short_grass"
+    },
+    "": {
+      "block": "spruce_fence_gate",
+      "properties": {
+        "facing": "west",
+        "in_wall": "false",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "loom",
+      "properties": {
+        "facing": "south"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "large_fern",
+      "properties": {
+        "half": "lower"
+      }
+    },
+    "": {
+      "block": "red_tulip"
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "white_concrete"
+    },
+    "": {
+      "block": "white_concrete_powder"
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "north",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_log",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    "": {
+      "block": "oak_log",
+      "properties": {
+        "axis": "x"
+      }
+    },
+    "": {
+      "block": "oak_slab",
+      "properties": {
+        "type": "bottom",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "east",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "west",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence_gate",
+      "properties": {
+        "facing": "north",
+        "in_wall": "false",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "oak_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mossy_cobblestone_slab",
+      "properties": {
+        "type": "bottom",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "sea_pickle",
+      "properties": {
+        "pickles": "2",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "player_head",
+      "properties": {
+        "powered": "false",
+        "rotation": "14"
+      }
+    },
+    "": {
+      "block": "chest",
+      "properties": {
+        "facing": "west",
+        "type": "single",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "dark_oak_pressure_plate",
+      "properties": {
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "campfire",
+      "properties": {
+        "facing": "north",
+        "lit": "true",
+        "signal_fire": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "loom",
+      "properties": {
+        "facing": "west"
+      }
+    },
+    "": {
+      "block": "lantern",
+      "properties": {
+        "hanging": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "barrel",
+      "properties": {
+        "facing": "up",
+        "open": "false"
+      }
+    },
+    "": {
+      "block": "barrel",
+      "properties": {
+        "facing": "east",
+        "open": "false"
+      }
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "south",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "waxed_exposed_copper_lantern",
+      "properties": {
+        "hanging": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "large_fern",
+      "properties": {
+        "half": "upper"
+      }
+    },
+    "": {
+      "block": "waxed_exposed_copper_lantern",
+      "properties": {
+        "hanging": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "flower_pot"
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "cauldron"
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "campfire",
+      "properties": {
+        "facing": "south",
+        "lit": "false",
+        "signal_fire": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    }
+  },
+  "layers": [
+    {
+      "y": 0,
+      "rows": [
+        ".................",
+        ".................",
+        ".................",
+        "............",
+        "..........",
+        "........",
+        "......",
+        "......",
+        "....",
+        "....",
+        ".....",
+        "......",
+        ".......",
+        "..........",
+        ".................",
+        ".................",
+        "................."
+      ]
+    },
+    {
+      "y": 1,
+      "rows": [
+        ".................",
+        "..............",
+        "..........",
+        "........",
+        "......",
+        "....",
+        "...",
+        "..",
+        "..",
+        "..",
+        ".....",
+        ".....",
+        ".......",
+        ".......",
+        "..........",
+        "..............",
+        "................."
+      ]
+    },
+    {
+      "y": 2,
+      "rows": [
+        "............",
+        "........",
+        "......",
+        "....",
+        "..",
+        "..",
+        "",
+        "",
+        "",
+        "..",
+        "..",
+        "...",
+        "....",
+        "......",
+        "......",
+        "........",
+        "............"
+      ]
+    },
+    {
+      "y": 3,
+      "rows": [
+        ".............",
+        "..........",
+        "........",
+        "........",
+        ".......",
+        ".........",
+        ".......",
+        "........",
+        "............",
+        ".........",
+        "..........",
+        "............",
+        "...........",
+        ".......",
+        "........",
+        "........",
+        "..........."
+      ]
+    },
+    {
+      "y": 4,
+      "rows": [
+        "................",
+        "............",
+        "..............",
+        "..............",
+        "...........",
+        "...............",
+        "..............",
+        ".............",
+        "...............",
+        "..........",
+        "...............",
+        "................",
+        "...............",
+        "................",
+        "..............",
+        "...............",
+        "..............."
+      ]
+    },
+    {
+      "y": 5,
+      "rows": [
+        ".................",
+        "..............",
+        "................",
+        "................",
+        "..............",
+        ".................",
+        ".................",
+        "...............",
+        ".............",
+        "............",
+        ".................",
+        ".................",
+        ".................",
+        ".................",
+        ".................",
+        "................",
+        "................."
+      ]
+    },
+    {
+      "y": 6,
+      "rows": [
+        ".................",
+        "................",
+        ".................",
+        ".................",
+        "................",
+        ".................",
+        ".................",
+        ".................",
+        "...............",
+        ".................",
+        ".................",
+        ".................",
+        ".................",
+        ".................",
+        ".................",
+        ".................",
+        "................."
+      ]
+    }
+  ],
+  "importNotes": {
+    "sourceFormatVersion": 3,
+    "sourceDataVersion": 4671,
+    "sourceMinY": 0,
+    "terrainTrimmed": false,
+    "omittedBlocks": [
+      "water",
+      "tall_seagrass",
+      "seagrass"
+    ],
+    "placedBlocks": 681,
+    "omittedBlockEntities": 21,
+    "omittedEntities": 6,
+    "substitutions": {
+      "water_cauldron": "cauldron"
+    }
+  }
+}

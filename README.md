@@ -193,6 +193,35 @@ Then ask the bot to collect the materials and build it:
 /w MineflayerBot build my build here
 ```
 
+Included imports are `embertrail_campsite` (17×7×17, 681 blocks),
+`medieval_house` (24×22×25, 2,581 blocks), and `elven_house_2`.
+Start with the campsite for a smaller build test:
+
+```text
+/w MineflayerBot build embertrail campsite here
+/w MineflayerBot collect the materials for medieval house
+/w MineflayerBot build medieval house here
+```
+
+Place the required materials and spare dirt/cobblestone for temporary supports
+in accessible nearby chests. These imports preserve block layouts, but omit
+entity and block-entity data (such as sign text, chest contents and custom head
+textures). The campsite omits water and seagrass and uses an empty cauldron;
+its JSON `importNotes` records these conversion limits. The medieval import
+updates old `grass` and `chain` names for Minecraft 1.21.11.
+
+Temporary supports use only cobblestone or dirt, never planks.
+After construction, the bot compares tracked supports with the schematic and
+removes them from the top down, without placing more scaffolding. If a higher
+support is unreachable, it retains the lower access route and reports the
+remaining cleanup. Blocks belonging to the schematic are protected.
+
+The builder checks actual blocks when reporting progress and can make up to
+two additional repair passes after an incomplete pass. It stops retrying if
+the remaining work does not decrease. Keep spare cobblestone or dirt
+in accessible supply chests for temporary access. Large imported builds are
+still experimental; a fully unattended build is not yet guaranteed.
+
 ## Development
 
 ```bash

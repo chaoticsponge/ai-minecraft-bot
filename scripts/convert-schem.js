@@ -6,10 +6,15 @@ const nbt = require('prismarine-nbt')
 const registry = require('prismarine-registry')('1.21.11')
 
 const FALLBACK_BLOCKS = {
+  grass: 'short_grass',
+  chain: 'iron_chain',
   polished_cinnabar_slab: 'polished_tuff_slab',
   polished_cinnabar_stairs: 'polished_tuff_stairs'
 }
 const ITEM_FOR_BLOCK = {
+  cave_vines: 'glow_berries',
+  cave_vines_plant: 'glow_berries',
+  tripwire: 'string',
   wall_torch: 'torch',
   soul_wall_torch: 'soul_torch',
   redstone_wall_torch: 'redstone_torch'
@@ -22,7 +27,7 @@ const REPLACE_BLOCK = {
   potted_dandelion: 'flower_pot',
   potted_poppy: 'flower_pot'
 }
-const OMIT_BLOCKS = new Set(['air', 'water', 'potatoes', 'carrots', 'wheat'])
+const OMIT_BLOCKS = new Set(['air', 'water', 'seagrass', 'tall_seagrass', 'potatoes', 'carrots', 'wheat'])
 const TERRAIN_BLOCKS = new Set(['dirt', 'grass_block', 'farmland'])
 
 function usage() {
@@ -168,6 +173,8 @@ async function main() {
       sourceDataVersion: schematic.DataVersion ?? null,
       sourceMinY: options.minY,
       terrainTrimmed: options.trimTerrain,
+      omittedBlocks: [...new Set(Object.values(stateById).map((raw) => parseState(raw).block))]
+        .filter((block) => block !== 'air' && OMIT_BLOCKS.has(block)),
       placedBlocks,
       omittedBlockEntities: blocks.BlockEntities?.length || 0,
       omittedEntities: schematic.Entities?.length || 0,

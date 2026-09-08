@@ -162,9 +162,10 @@ class RecoveryManager {
         const targetText = target
           ? ` while handling ${target.block} at ${target.x},${target.y},${target.z}`
           : ''
+        const activityText = this.executor.activity ? `; activity=${this.executor.activity}` : ''
         const message = `Progress watchdog: ${action.type} made no observable progress for ${Math.max(1, Math.round(timeout / 1000))}s ` +
           `at ${Math.floor(position.x)}, ${Math.floor(position.y)}, ${Math.floor(position.z)} ` +
-          `(pathfinder ${active ? 'active' : 'inactive'})${targetText}`
+          `(pathfinder ${active ? 'active' : 'inactive'}${activityText})${targetText}`
         console.warn(message)
         controller.abort()
         rejectFailure(new Error(message))

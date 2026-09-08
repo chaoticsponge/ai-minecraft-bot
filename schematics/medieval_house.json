@@ -1,0 +1,2006 @@
+{
+  "format": "mineflayer-blueprint-v2",
+  "name": "medieval_house",
+  "description": "Converted from mrlionmedievalhouse60.schem",
+  "size": {
+    "x": 24,
+    "y": 22,
+    "z": 25
+  },
+  "anchor": {
+    "x": 12,
+    "y": 0,
+    "z": 0,
+    "description": "Front-center ground block"
+  },
+  "palette": {
+    ".": "air",
+    "": {
+      "block": "moss_block"
+    },
+    "": {
+      "block": "jungle_planks"
+    },
+    "": {
+      "block": "short_grass"
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stripped_spruce_wood",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stripped_oak_wood",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    "": {
+      "block": "stripped_oak_wood",
+      "properties": {
+        "axis": "x"
+      }
+    },
+    "": {
+      "block": "tripwire",
+      "item": "string",
+      "properties": {
+        "attached": "false",
+        "disarmed": "false",
+        "east": "false",
+        "north": "false",
+        "powered": "false",
+        "south": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "hay_block",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "hay_block",
+      "properties": {
+        "axis": "x"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "low",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "bamboo_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_door",
+      "properties": {
+        "facing": "west",
+        "half": "lower",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "low",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "oak_button",
+      "properties": {
+        "face": "wall",
+        "facing": "north",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "oak_button",
+      "properties": {
+        "face": "wall",
+        "facing": "west",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "lantern",
+      "properties": {
+        "hanging": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_button",
+      "properties": {
+        "face": "wall",
+        "facing": "east",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "0",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_door",
+      "properties": {
+        "facing": "west",
+        "half": "upper",
+        "hinge": "right",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_button",
+      "properties": {
+        "face": "wall",
+        "facing": "south",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "tall",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "oak_fence_gate",
+      "properties": {
+        "facing": "south",
+        "in_wall": "true",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "tall"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "lantern",
+      "properties": {
+        "hanging": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "north",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "west",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "east",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines_plant",
+      "item": "glow_berries",
+      "properties": {
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "15",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_wall_sign",
+      "item": "spruce_sign",
+      "properties": {
+        "facing": "south",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "white_concrete"
+    },
+    "": {
+      "block": "red_concrete"
+    },
+    "": {
+      "block": "oak_fence_gate",
+      "properties": {
+        "facing": "east",
+        "in_wall": "false",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "iron_chain",
+      "properties": {
+        "axis": "y",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence_gate",
+      "properties": {
+        "facing": "west",
+        "in_wall": "false",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "12",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "bamboo_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "6",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "8",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "5",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "7",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stripped_oak_wood",
+      "properties": {
+        "axis": "z"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_slab",
+      "properties": {
+        "type": "top",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "17",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "spruce_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "false",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_wall_sign",
+      "item": "oak_sign",
+      "properties": {
+        "facing": "north",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stripped_spruce_wood",
+      "properties": {
+        "axis": "x"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_wall_sign",
+      "item": "oak_sign",
+      "properties": {
+        "facing": "west",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "stripped_spruce_wood",
+      "properties": {
+        "axis": "z"
+      }
+    },
+    "": {
+      "block": "oak_wall_sign",
+      "item": "oak_sign",
+      "properties": {
+        "facing": "east",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_wall_sign",
+      "item": "oak_sign",
+      "properties": {
+        "facing": "south",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_trapdoor",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "open": "true",
+        "powered": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "low",
+        "north": "none",
+        "south": "low",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "low",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "low"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "tall",
+        "north": "none",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "low"
+      }
+    },
+    "": {
+      "block": "oak_fence_gate",
+      "properties": {
+        "facing": "east",
+        "in_wall": "true",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "low",
+        "south": "low",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "none",
+        "north": "none",
+        "south": "low",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "oak_fence_gate",
+      "properties": {
+        "facing": "west",
+        "in_wall": "true",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "mud_brick_wall",
+      "properties": {
+        "east": "low",
+        "north": "low",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "oak_fence_gate",
+      "properties": {
+        "facing": "north",
+        "in_wall": "true",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "10",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "23",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "9",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "cave_vines",
+      "item": "glow_berries",
+      "properties": {
+        "age": "24",
+        "berries": "false"
+      }
+    },
+    "": {
+      "block": "campfire",
+      "properties": {
+        "facing": "east",
+        "lit": "false",
+        "signal_fire": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "flowering_azalea_leaves",
+      "properties": {
+        "distance": "7",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "flowering_azalea_leaves",
+      "properties": {
+        "distance": "1",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "flowering_azalea_leaves",
+      "properties": {
+        "distance": "2",
+        "persistent": "true",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "true",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "campfire",
+      "properties": {
+        "facing": "west",
+        "lit": "false",
+        "signal_fire": "false",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "true",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "true"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "false",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "true",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "east",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "oak_fence",
+      "properties": {
+        "east": "false",
+        "north": "true",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "polished_andesite"
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "inner_left",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "jungle_stairs",
+      "properties": {
+        "facing": "west",
+        "half": "top",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "andesite_wall",
+      "properties": {
+        "east": "none",
+        "north": "none",
+        "south": "tall",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "tall"
+      }
+    },
+    "": {
+      "block": "brick_stairs",
+      "properties": {
+        "facing": "south",
+        "half": "bottom",
+        "shape": "inner_right",
+        "waterlogged": "false"
+      }
+    },
+    "": {
+      "block": "andesite_wall",
+      "properties": {
+        "east": "tall",
+        "north": "none",
+        "south": "tall",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "andesite_wall",
+      "properties": {
+        "east": "tall",
+        "north": "tall",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "none"
+      }
+    },
+    "": {
+      "block": "andesite_wall",
+      "properties": {
+        "east": "none",
+        "north": "tall",
+        "south": "none",
+        "up": "true",
+        "waterlogged": "false",
+        "west": "tall"
+      }
+    }
+  },
+  "layers": [
+    {
+      "y": 0,
+      "rows": [
+        ".....................",
+        "..............",
+        "..........",
+        ".......",
+        ".....",
+        "....",
+        "...",
+        "..",
+        "..",
+        ".",
+        ".",
+        ".",
+        ".",
+        ".",
+        ".",
+        "..",
+        "..",
+        "....",
+        "....",
+        "......",
+        ".......",
+        "..........",
+        "............",
+        "................",
+        "..................."
+      ]
+    },
+    {
+      "y": 1,
+      "rows": [
+        "......................",
+        "................",
+        "...........",
+        ".........",
+        "..........",
+        "......",
+        "........",
+        "..............",
+        "............",
+        "..............",
+        "...............",
+        "..............",
+        ".............",
+        "................",
+        ".............",
+        "...............",
+        "..............",
+        "................",
+        "................",
+        "..........",
+        ".......",
+        "..............",
+        ".............",
+        "................",
+        "..................."
+      ]
+    },
+    {
+      "y": 2,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "......................",
+        ".....................",
+        "............",
+        "..................",
+        "...................",
+        "...................",
+        ".....................",
+        "...................",
+        "..................",
+        "................",
+        "....................",
+        ".....................",
+        "..................",
+        "......................",
+        "....................",
+        "....................",
+        "..................",
+        "................",
+        ".....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 3,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "....................",
+        "....................",
+        ".........",
+        ".................",
+        ".....................",
+        "....................",
+        "...................",
+        "...................",
+        "..................",
+        "...................",
+        "...................",
+        "...................",
+        "..................",
+        "...................",
+        "......................",
+        "......................",
+        "..................",
+        "............",
+        ".....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 4,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "....................",
+        "..................",
+        "..........",
+        "...............",
+        "...................",
+        "..................",
+        "....................",
+        "...................",
+        "...................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        ".....................",
+        "...................",
+        "....................",
+        ".................",
+        "................",
+        ".....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 5,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "....................",
+        ".........",
+        "............",
+        "...................",
+        "................",
+        "..................",
+        "................",
+        "..................",
+        ".................",
+        "..................",
+        ".................",
+        "...................",
+        "...................",
+        ".................",
+        "....................",
+        "...............",
+        ".............",
+        "........................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 6,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........",
+        "......",
+        "......",
+        "......",
+        "......",
+        ".......",
+        ".......",
+        "........",
+        ".......",
+        ".......",
+        ".......",
+        "......",
+        ".......",
+        "...........",
+        "...........",
+        "...........",
+        "...........",
+        ".............",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 7,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        ".....................",
+        ".......",
+        ".............",
+        "...................",
+        "...................",
+        "................",
+        "..............",
+        "...................",
+        "....................",
+        "....................",
+        "...................",
+        "...........",
+        ".................",
+        "....................",
+        "....................",
+        "..............",
+        "...........",
+        ".....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 8,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        ".....................",
+        "........",
+        "..............",
+        "..................",
+        "....................",
+        "...............",
+        ".................",
+        "..................",
+        "......................",
+        "....................",
+        "...................",
+        "...............",
+        ".................",
+        "....................",
+        "....................",
+        "..............",
+        "...........",
+        ".....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 9,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        ".....................",
+        "........",
+        ".................",
+        "....................",
+        ".....................",
+        ".................",
+        "................",
+        "..................",
+        ".....................",
+        "....................",
+        "...................",
+        "..............",
+        "...................",
+        "......................",
+        "......................",
+        "..................",
+        "...........",
+        ".....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 10,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        ".....................",
+        "............",
+        "...............",
+        "..................",
+        "...................",
+        ".................",
+        "................",
+        "...................",
+        ".....................",
+        "...................",
+        "....................",
+        "..............",
+        "...................",
+        "....................",
+        "....................",
+        "................",
+        "...............",
+        "....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 11,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "...................",
+        ".......",
+        ".........",
+        "...............",
+        "...............",
+        "............",
+        "...........",
+        "..............",
+        "...............",
+        "..............",
+        ".............",
+        "...........",
+        ".................",
+        "....................",
+        "....................",
+        "..............",
+        "...........",
+        "...................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 12,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "...........",
+        "...........",
+        "...............",
+        "...................",
+        "...................",
+        "...................",
+        "...............",
+        "................",
+        ".................",
+        ".................",
+        "................",
+        "...............",
+        "...................",
+        "...................",
+        "...................",
+        "...............",
+        "...........",
+        "...........",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 13,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "...............",
+        "................",
+        "................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".....................",
+        ".................",
+        "......................",
+        "......................",
+        ".................",
+        ".....................",
+        ".....................",
+        "......................",
+        "......................",
+        ".................",
+        ".................",
+        "...............",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 14,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "....................",
+        "............",
+        "................",
+        "....................",
+        "....................",
+        "...................",
+        "................",
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+        "................",
+        "...................",
+        ".....................",
+        ".....................",
+        "................",
+        "............",
+        "....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 15,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "....................",
+        "....................",
+        "...............",
+        ".....................",
+        ".....................",
+        "...............",
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+        ".....................",
+        "...............",
+        ".....................",
+        ".....................",
+        "...............",
+        "....................",
+        ".....................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 16,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "......................",
+        "......................",
+        "......................",
+        "..............",
+        "..............",
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+        "....................",
+        "....................",
+        "..............",
+        "..............",
+        "......................",
+        "......................",
+        "......................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 17,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "......................",
+        "......................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 18,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "......................",
+        "......................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 19,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "......................",
+        "......................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 20,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "......................",
+        "......................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    },
+    {
+      "y": 21,
+      "rows": [
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "......................",
+        "......................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................"
+      ]
+    }
+  ],
+  "importNotes": {
+    "sourceFormatVersion": 2,
+    "sourceDataVersion": 3465,
+    "sourceMinY": 0,
+    "terrainTrimmed": false,
+    "omittedBlocks": [],
+    "placedBlocks": 2581,
+    "omittedBlockEntities": 211,
+    "omittedEntities": 0,
+    "substitutions": {
+      "grass": "short_grass",
+      "chain": "iron_chain"
+    }
+  }
+}

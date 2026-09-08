@@ -140,13 +140,13 @@ function missingBuildMaterialForFailure(failure) {
   if (failure?.category !== 'missing_resource' ||
       !['build_schematic', 'repair_schematic'].includes(failure.action?.type)) return null
   const message = String(failure.error || '').toLowerCase()
-  if (/no dirt or stone blocks|cannot support floating build block/.test(message)) return 'build_scaffold'
+  if (/no dirt or stone (?:blocks|scaffold)|cannot support floating build block/.test(message)) return 'build_scaffold'
   return message.match(/missing build supply ([a-z0-9_]+)/)?.[1] || null
 }
 
 function buildMaterialLabel(material) {
   if (material === 'build_scaffold') {
-    return 'scaffold blocks (dirt, cobblestone, stone, tuff, andesite, diorite, granite, calcite, or sandstone)'
+    return 'scaffold blocks (cobblestone or dirt)'
   }
   return material.replaceAll('_', ' ')
 }
@@ -890,12 +890,12 @@ class BotController {
               resumeIndex = 0
               this.whisper(requester, `I still need a ${equipmentLabel(equipment)}; the task remains checkpointed.`)
             }
-            if (failed.category === 'build_access' &&
+            if (['build_access', 'build_incomplete', 'build_cleanup'].includes(failed.category) &&
                 ['build_schematic', 'repair_schematic'].includes(failed.action?.type)) {
-              state.phase = 'blocked_build_access'
+              state.phase = 'blocked_build'
               this.whisperLong(
                 requester,
-                `I placed everything I can reach, but ${failed.error}. ` +
+                `I placed everything else I could, but ${failed.error}. ` +
                 `The build is checkpointed—clear or open access around those spots, then tell me "resume".`
               )
               return

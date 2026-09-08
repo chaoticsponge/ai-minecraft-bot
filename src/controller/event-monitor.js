@@ -40,6 +40,19 @@ function suffocatingBlock(bot) {
   // in-wall suffocation for these transparent shapes, so digging them as an
   // emergency response damages a valid build and creates an interrupt loop.
   if (block.transparent === true) return null
+  // `transparent` is registry/render metadata and is not consistently true
+  // for fences and walls. Use the collision geometry when available: only a
+  // shape filling the complete head cell can actually trap the player as a
+  // solid cube. Partial posts, panes, stairs, slabs, and attachments must not
+  // be mined out of a schematic by the survival monitor.
+  if (Array.isArray(block.shapes) && block.shapes.length > 0) {
+    const fullCube = block.shapes.some((shape) => Array.isArray(shape) && shape.length >= 6 &&
+      shape[0] <= 0 && shape[1] <= 0 && shape[2] <= 0 &&
+      shape[3] >= 1 && shape[4] >= 1 && shape[5] >= 1)
+    if (!fullCube) return null
+  } else if (/(?:_fence|_wall|_pane|_stairs|_slab|_door|_trapdoor|_button)$/.test(block.name)) {
+    return null
+  }
   return block
 }
 

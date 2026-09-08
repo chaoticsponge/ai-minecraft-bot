@@ -10,6 +10,7 @@ const { InventoryTracker } = require('./inventory-tracker')
 const { EntityTracker } = require('./entity-tracker')
 const { InventoryPolicy } = require('./inventory-policy')
 const { ContainerTracker, CONTAINER_NAMES } = require('./container-tracker')
+const { isScaffoldMaterial, isRecoverableScaffold } = require('./scaffold-policy')
 
 const UNSAFE_FOODS = new Set([
   'chorus_fruit', 'pufferfish', 'poisonous_potato', 'rotten_flesh', 'spider_eye', 'raw_chicken'
@@ -26,15 +27,8 @@ const CARDINAL_DIRECTIONS = {
   east: new Vec3(1, 0, 0),
   west: new Vec3(-1, 0, 0)
 }
-const SCAFFOLD_PRIORITY = [
-  'dirt', 'cobblestone', 'cobbled_deepslate', 'stone', 'netherrack',
-  'tuff', 'andesite', 'diorite', 'granite', 'calcite', 'sandstone', 'smooth_sandstone'
-]
-const SCAFFOLD_BLOCKS = new Set(SCAFFOLD_PRIORITY)
-const SCAFFOLD_RESTOCK_PRIORITY = [
-  'cobbled_deepslate', 'cobblestone', 'dirt', 'stone', 'netherrack',
-  'tuff', 'andesite', 'diorite', 'granite', 'calcite', 'sandstone', 'smooth_sandstone'
-]
+const SCAFFOLD_BLOCKS = { has: isScaffoldMaterial }
+const SCAFFOLD_RESTOCK_PRIORITY = ['cobblestone', 'dirt']
 const MINING_STORAGE_ITEMS = new Set([
   'stone', 'cobblestone', 'deepslate', 'cobbled_deepslate', 'tuff', 'calcite',
   'granite', 'diorite', 'andesite', 'gravel', 'flint', 'dirt', 'sand', 'red_sand'
@@ -107,9 +101,10 @@ function wait(ms, signal) {
   })
 }
 
-async function cancellable(promise, signal, cancel) {
+async function cancellable(promise, signal, cancel, timeoutMs = null, timeoutLabel = 'operation') {
   if (signal.aborted) throw abortError()
   let onAbort
+  let timer
   const cancelled = new Promise((resolve, reject) => {
     onAbort = () => {
       try { cancel() } catch {}
@@ -117,10 +112,39 @@ async function cancellable(promise, signal, cancel) {
     }
     signal.addEventListener('abort', onAbort, { once: true })
   })
+  const timedOut = Number.isFinite(timeoutMs) && timeoutMs > 0
+    ? new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+          try { cancel() } catch {}
+          reject(new Error(`${timeoutLabel} timed out after ${timeoutMs}ms`))
+        }, timeoutMs)
+      })
+    : null
   try {
-    return await Promise.race([promise, cancelled])
+    return await Promise.race(timedOut ? [promise, cancelled, timedOut] : [promise, cancelled])
   } finally {
+    clearTimeout(timer)
     signal.removeEventListener('abort', onAbort)
+  }
+}
+
+async function withDeadlineSignal(operation, parentSignal, timeoutMs, label) {
+  if (parentSignal.aborted) throw abortError()
+  const controller = new AbortController()
+  const forwardAbort = () => controller.abort()
+  parentSignal.addEventListener('abort', forwardAbort, { once: true })
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await operation(controller.signal)
+  } catch (error) {
+    if (parentSignal.aborted) throw error
+    if (controller.signal.aborted && error?.name === 'AbortError') {
+      throw new Error(`${label} timed out after ${timeoutMs}ms`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+    parentSignal.removeEventListener('abort', forwardAbort)
   }
 }
 
@@ -143,6 +167,7 @@ class ActionExecutor {
     this.emergencyWaterPosition = null
     this.buildSupplyWake = null
     this.lastStorageScaffoldAttemptAt = 0
+    this.unreachableDropCooldowns = new Map()
   }
 
   async maintainToolSet(signal) {
@@ -544,7 +569,7 @@ class ActionExecutor {
     return `Respawned and reached ${reached}/${drops.length} dropped inventory stack(s)`
   }
 
-  async recoverStuck(startPosition, signal) {
+  async recoverStuck(startPosition, signal, trackScaffold = null) {
     this.stop()
     this.bot.pathfinder.movements.clearCollisionIndex()
     const current = this.bot.entity.position.floored()
@@ -558,8 +583,23 @@ class ActionExecutor {
         if (!movements.scafoldingBlocks.includes(scaffold.type)) movements.scafoldingBlocks.push(scaffold.type)
         movements.allow1by1towers = true
         try {
-          await this.gotoBounded(new goals.GoalY(targetY), signal, 12)
-          return `towered out of a ${targetY - current.y}-block fall`
+          // GoalY may resolve against an abstract path node without moving the
+          // entity, especially inside a dense schematic. Pinning X/Z forces a
+          // real vertical scaffold tower at the verified open column.
+          let pathFailure = null
+          try {
+            await this.gotoBounded(new goals.GoalBlock(current.x, targetY, current.z), signal, 12, 12000)
+          } catch (error) {
+            if (error.name === 'AbortError') throw error
+            pathFailure = error
+          }
+          const reachedY = this.bot.entity.position.floored().y
+          if (reachedY >= targetY) return `towered out of a ${targetY - current.y}-block fall`
+          console.warn(
+            `Pathfinder tower did not reach Y ${targetY}` +
+            `${pathFailure ? ` (${pathFailure.message})` : ''}; using verified manual scaffolding`
+          )
+          return this.manualScaffoldTower(targetY, signal, trackScaffold)
         } finally {
           movements.allow1by1towers = previousTower
           movements.scafoldingBlocks.splice(0, movements.scafoldingBlocks.length, ...previousScaffolds)
@@ -586,6 +626,77 @@ class ActionExecutor {
     return 'moved to a nearby safe block and cleared the path cache'
   }
 
+  async manualScaffoldTower(targetY, signal, trackScaffold = null) {
+    const startedY = this.bot.entity.position.floored().y
+    while (this.bot.entity.position.floored().y < targetY) {
+      if (signal.aborted) throw abortError()
+      const feet = this.bot.entity.position.floored()
+      const supportPosition = feet.offset(0, -1, 0)
+      const support = this.bot.blockAt(supportPosition)
+      const destination = feet.clone()
+      for (const position of [destination, feet.offset(0, 1, 0), feet.offset(0, 2, 0)]) {
+        if (!this.isEmptyPlacementCell(this.bot.blockAt(position))) {
+          throw new Error(`manual scaffold tower needs an empty column at ${position}`)
+        }
+      }
+      if (!support || this.isPassable(support) || this.isLiquid(support)) {
+        throw new Error(`manual scaffold tower has no solid support at ${supportPosition}`)
+      }
+      const scaffold = this.scaffoldItem()
+      if (!scaffold) throw new Error(`manual scaffold tower ran out of dirt or stone at Y ${feet.y}`)
+      await this.bot.equip(scaffold, 'hand')
+      await this.bot.lookAt(supportPosition.offset(0.5, 1, 0.5), true)
+      this.bot.setControlState('jump', true)
+      let placementError = null
+      try {
+        const jumpDeadline = Date.now() + 1800
+        while (this.bot.entity.position.y < feet.y + 1.15 && Date.now() < jumpDeadline) {
+          await wait(50, signal)
+        }
+        if (this.bot.entity.position.y < feet.y + 1.15) {
+          throw new Error(`manual scaffold jump did not rise above Y ${feet.y}`)
+        }
+        try {
+          await cancellable(
+            this.bot.placeBlock(support, new Vec3(0, 1, 0)), signal,
+            () => {}, 3000, `manual scaffold placement at ${destination}`
+          )
+        } catch (error) {
+          if (error.name === 'AbortError') throw error
+          placementError = error
+        }
+      } finally {
+        this.bot.setControlState('jump', false)
+      }
+      const landingDeadline = Date.now() + 2200
+      while ((!this.bot.entity.onGround || this.bot.entity.position.floored().y <= feet.y) &&
+             Date.now() < landingDeadline) {
+        await wait(50, signal)
+      }
+      if (!this.bot.entity.onGround || this.bot.entity.position.floored().y <= feet.y) {
+        throw placementError || new Error(`manual scaffold tower did not land above Y ${feet.y}`)
+      }
+      let stableSince = null
+      const stableDeadline = Date.now() + 1000
+      while (Date.now() < stableDeadline) {
+        const placed = this.bot.blockAt(destination)
+        if (placed && !this.isPassable(placed) && !this.isLiquid(placed)) {
+          stableSince ||= Date.now()
+          if (Date.now() - stableSince >= 300) break
+        } else {
+          stableSince = null
+        }
+        await wait(50, signal)
+      }
+      if (!stableSince || Date.now() - stableSince < 300) {
+        throw placementError || new Error(`manual scaffold placement was not stable at ${destination}`)
+      }
+      if (placementError) console.log(`Confirmed delayed manual scaffold placement at ${destination}`)
+      trackScaffold?.(destination)
+    }
+    return `manually scaffolded from Y ${startedY} to Y ${this.bot.entity.position.floored().y}`
+  }
+
   assertNearby(position) {
     const distance = this.bot.entity.position.distanceTo(position)
     if (distance > this.limits.maxMoveDistance) {
@@ -593,7 +704,39 @@ class ActionExecutor {
     }
   }
 
-  async gotoBounded(goal, signal, searchRadius = this.limits.localPathSearchRadius || 10) {
+  async stepOffPartialBlock(signal) {
+    const origin = this.bot.entity.position.floored()
+    const underfoot = this.bot.blockAt?.(origin)
+    if (!underfoot?.name?.endsWith('_slab') || underfoot.getProperties?.().type !== 'bottom') return false
+    if (Date.now() - (this.lastPartialBlockEscape || 0) < 10000) return false
+    this.lastPartialBlockEscape = Date.now()
+    const candidates = Object.values(CARDINAL_DIRECTIONS).map((direction) => origin.plus(direction))
+      .filter((position) => this.canStandAt(position) &&
+        [position, position.offset(0, 1, 0)]
+          .every((cell) => this.isEmptyPlacementCell(this.bot.blockAt(cell))))
+    for (const candidate of candidates) {
+      if (signal.aborted) throw abortError()
+      await this.bot.lookAt(candidate.offset(0.5, 1.62, 0.5), true)
+      this.bot.setControlState('forward', true)
+      try {
+        const deadline = Date.now() + 1000
+        while (Date.now() < deadline) {
+          await wait(50, signal)
+          const position = this.bot.entity.position
+          if (Math.hypot(position.x - candidate.x - 0.5, position.z - candidate.z - 0.5) < 0.3) {
+            console.log(`Stepped off bottom slab at ${origin} onto existing footing at ${candidate}`)
+            return true
+          }
+        }
+      } finally {
+        this.bot.clearControlStates()
+      }
+      break
+    }
+    return false
+  }
+
+  async gotoBounded(goal, signal, searchRadius = this.limits.localPathSearchRadius || 10, timeoutMs = null) {
     const previousRadius = this.bot.pathfinder.searchRadius
     const movements = this.bot.pathfinder.movements
     const previousCanDig = movements?.canDig
@@ -601,13 +744,46 @@ class ActionExecutor {
     // Navigation should walk through the world, not silently reshape it.
     // Mining/building skills excavate or scaffold their intended cells first.
     if (movements) movements.canDig = false
+    let timeout
     try {
-      return await cancellable(
+      const movement = cancellable(
         this.bot.pathfinder.goto(goal),
         signal,
         () => this.bot.pathfinder.stop()
       )
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) await movement
+      else await Promise.race([
+        movement,
+        new Promise((resolve, reject) => {
+          timeout = setTimeout(() => {
+            this.bot.pathfinder.stop()
+            reject(new Error(`path attempt timed out after ${timeoutMs}ms`))
+          }, timeoutMs)
+        })
+      ])
+      // The installed goto helper resolves empty paths even for noPath results.
+      // Verify against the real entity before allowing a dig, placement or
+      // container operation to proceed from a fictional arrival position.
+      const feet = this.bot.entity?.position?.floored()
+      if (feet && typeof goal.isEnd === 'function' && !goal.isEnd(feet)) {
+        if (!this.lastNavigationFailureSnapshot || Date.now() - this.lastNavigationFailureSnapshot > 60000) {
+          this.lastNavigationFailureSnapshot = Date.now()
+          const cells = []
+          for (let y = -1; y <= 2; y += 1) {
+            for (const [x, z] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const position = feet.offset(x, y, z)
+              const block = this.bot.blockAt?.(position)
+              cells.push(`${position}:${block?.name || 'unloaded'}:${JSON.stringify(block?.getProperties?.() || {})}`)
+            }
+          }
+          console.warn(`Navigation stalled; onGround=${this.bot.entity.onGround}; surroundings=${cells.join(' ')}`)
+        }
+        this.bot.pathfinder.setGoal(null)
+        await this.stepOffPartialBlock(signal)
+        throw new Error(`No path to the goal: navigation returned before arrival at ${feet}`)
+      }
     } finally {
+      clearTimeout(timeout)
       if (movements) movements.canDig = previousCanDig
       this.bot.pathfinder.searchRadius = previousRadius
       this.bot.pathfinder.movements.clearCollisionIndex()
@@ -1184,13 +1360,17 @@ class ActionExecutor {
     return candidates[0] ? { block: candidates[0], tier: `${tier.name}, ${strategy}`, strategy } : null
   }
 
-  async returnFromTreeAndRecoverScaffolds(treeBase, scaffolds, signal) {
+  async returnFromTreeAndRecoverScaffolds(treeBase, scaffolds, signal, {
+    protectPosition = () => false, strictTopDown = false
+  } = {}) {
     const pathMovements = this.bot.pathfinder.movements
     const collectMovements = this.bot.collectBlock.movements
     const previousPathTower = pathMovements.allow1by1towers
     const previousCollectTower = collectMovements.allow1by1towers
     const previousPathScaffolds = [...pathMovements.scafoldingBlocks]
     const previousCollectScaffolds = [...collectMovements.scafoldingBlocks]
+    const previousPathDig = pathMovements.canDig
+    const previousCollectDig = collectMovements.canDig
     // Cleanup must only walk and dig. Letting either pathfinder place blocks
     // here can fail when no scaffold is held or create another support while
     // attempting to remove the previous one.
@@ -1198,6 +1378,8 @@ class ActionExecutor {
     collectMovements.allow1by1towers = false
     pathMovements.scafoldingBlocks.splice(0)
     collectMovements.scafoldingBlocks.splice(0)
+    pathMovements.canDig = false
+    collectMovements.canDig = false
     try {
       if ((this.inventoryTracker?.freeSlots?.() ?? 1) < 1) {
         try {
@@ -1210,7 +1392,54 @@ class ActionExecutor {
           console.warn(`Could not free a slot before scaffold cleanup: ${error.message}`)
         }
       }
-      if (treeBase && !signal.aborted) {
+      // Start at the bot's current (usually highest) build position and remove
+      // supports top-down. Returning to ground first strands the bot below a
+      // tall scaffold after construction has already disabled tower building.
+      const positions = [...scaffolds.values()].sort((a, b) => b.y - a.y)
+      let blockedY = null
+      for (const position of positions) {
+        if (signal.aborted) throw abortError()
+        // Do not dismantle the lower access route while higher supports still
+        // need it. Retry the same layer using existing routes on the next pass.
+        if (strictTopDown && blockedY !== null && position.y < blockedY) break
+        if (protectPosition(position)) {
+          scaffolds.delete(position.toString())
+          continue
+        }
+        const block = this.bot.blockAt(position)
+        // Unloaded chunks are unknown, not evidence of successful removal.
+        if (!block) {
+          blockedY = position.y
+          continue
+        }
+        if (!isRecoverableScaffold(block.name)) {
+          scaffolds.delete(position.toString())
+          continue
+        }
+        try {
+          await this.ensureCollectBlockSlot('recovering temporary scaffolding')
+          // Construction cleanup must not craft/place a workstation or new
+          // supports. collectBlockBounded equips tools already carried.
+          if (!strictTopDown) {
+            await this.toolManager.ensureTool(
+              block.name === 'dirt' ? 'shovel' : 'pickaxe', signal
+            )
+          }
+          await this.collectBlockBounded(block, signal, 10)
+          const after = this.bot.blockAt(position)
+          if (!after || isRecoverableScaffold(after.name)) {
+            blockedY = position.y
+            continue
+          }
+          scaffolds.delete(position.toString())
+          console.log(`Recovered tree scaffold ${block.name} at ${position}`)
+        } catch (error) {
+          if (error.name === 'AbortError') throw error
+          blockedY = position.y
+          console.warn(`Could not recover tree scaffold at ${position}: ${error.message}`)
+        }
+      }
+      if (treeBase && !signal.aborted && (!strictTopDown || scaffolds.size === 0)) {
         try {
           await this.gotoBounded(
             new goals.GoalNear(treeBase.x, treeBase.y, treeBase.z, 3), signal,
@@ -1218,32 +1447,13 @@ class ActionExecutor {
           )
         } catch (error) {
           if (error.name === 'AbortError') throw error
-          console.warn(`Could not path back to the tree base: ${error.message}`)
+          console.warn(`Could not path back to the cleanup base: ${error.message}`)
         }
-      }
-
-      const positions = [...scaffolds.values()].sort((a, b) => b.y - a.y)
-      for (const position of positions) {
-        if (signal.aborted) throw abortError()
-        const block = this.bot.blockAt(position)
-        if (!block || !SCAFFOLD_BLOCKS.has(block.name)) continue
-        try {
-          await this.ensureCollectBlockSlot('recovering temporary scaffolding')
-          await this.toolManager.ensureTool(
-            block.name === 'dirt' ? 'shovel' : 'pickaxe',
-            signal
-          )
-          await this.collectBlockBounded(block, signal, 10)
-          console.log(`Recovered tree scaffold ${block.name} at ${position}`)
-        } catch (error) {
-          if (error.name === 'AbortError') throw error
-          console.warn(`Could not recover tree scaffold at ${position}: ${error.message}`)
-        }
-      }
-      if (treeBase && !signal.aborted) {
         await this.collectDropsNear(treeBase, signal, null, 8, 500)
       }
     } finally {
+      pathMovements.canDig = previousPathDig
+      collectMovements.canDig = previousCollectDig
       pathMovements.allow1by1towers = previousPathTower
       collectMovements.allow1by1towers = previousCollectTower
       pathMovements.scafoldingBlocks.splice(0, pathMovements.scafoldingBlocks.length, ...previousPathScaffolds)
@@ -1257,6 +1467,10 @@ class ActionExecutor {
 
   isPassable(block) {
     return block && block.boundingBox === 'empty' && !this.isLiquid(block)
+  }
+
+  isEmptyPlacementCell(block) {
+    return !block || ['air', 'cave_air', 'void_air'].includes(block.name)
   }
 
   adjacentFluids(position) {
@@ -1694,9 +1908,8 @@ class ActionExecutor {
 
   scaffoldItem() {
     const items = this.bot.inventory.items()
-    return SCAFFOLD_PRIORITY
-      .map((name) => items.find((item) => item.name === name))
-      .find(Boolean) || null
+    return items.find((item) => item.name === 'dirt') ||
+      items.find((item) => item.name === 'cobblestone') || null
   }
 
   async ensurePlacementScaffold(signal, preserveItem = null) {
@@ -1766,6 +1979,29 @@ class ActionExecutor {
     return created
   }
 
+  buildAccessRouteIsClear(route) {
+    // Survey the whole route before spending supports or walking into a
+    // dead-end pocket. Unknown cells are not permission to build blindly.
+    return route.every((feet) => {
+      const cells = [feet, feet.offset(0, 1, 0), feet.offset(0, -1, 0)]
+        .map((position) => this.bot.blockAt(position))
+      return cells.every((block) => block && !this.isLiquid(block)) &&
+        this.isPassable(cells[0]) && this.isPassable(cells[1])
+    })
+  }
+
+  async tryBuildAccessRoute(operation, signal, failures) {
+    if (signal.aborted) throw abortError()
+    try {
+      return await operation()
+    } catch (error) {
+      if (signal.aborted || error.name === 'AbortError') throw error
+      if (!/no dirt or stone blocks|cannot reach staircase break|no solid face available|cannot support floating build block|no path|path.*timed out/i.test(error.message)) throw error
+      failures.push(error)
+      return false
+    }
+  }
+
   async createPlacementStaircase(stance, signal, preserveItem = null, trackScaffold = null) {
     const start = this.bot.entity.position.floored()
     const rise = stance.y - start.y
@@ -1779,6 +2015,15 @@ class ActionExecutor {
     // the 1:1 maximum slope, but permit a local staircase across the full
     // placement-search radius.
     if (rise < 1 || rise > 12 || steps < rise || steps > 16) return false
+    const plannedRoute = Array.from({ length: steps }, (_, offset) => {
+      const index = offset + 1
+      return new Vec3(
+        start.x + Math.round(dx * index / steps),
+        start.y + Math.min(index, rise),
+        start.z + Math.round(dz * index / steps)
+      )
+    })
+    if (!this.buildAccessRouteIsClear(plannedRoute)) return false
     const route = [start.clone()]
     for (let index = 1; index <= steps; index += 1) {
       const feet = new Vec3(
@@ -1825,6 +2070,15 @@ class ActionExecutor {
     const dz = stance.z - start.z
     const steps = Math.max(Math.abs(dx), Math.abs(dz))
     if (steps < 1 || steps > 20 || Math.abs(dy) > 2) return false
+    const plannedRoute = Array.from({ length: steps }, (_, offset) => {
+      const index = offset + 1
+      return new Vec3(
+        start.x + Math.round(dx * index / steps),
+        start.y + Math.round(dy * index / steps),
+        start.z + Math.round(dz * index / steps)
+      )
+    })
+    if (!this.buildAccessRouteIsClear(plannedRoute)) return false
     const movements = this.bot.pathfinder?.movements
     const previousDrop = movements?.maxDropDown
     if (movements) movements.maxDropDown = 1
@@ -1861,6 +2115,112 @@ class ActionExecutor {
     }
   }
 
+  async recoverBuildPit(targetY, bounds, signal, clearAccess = null, trackScaffold = null) {
+    const start = this.bot.entity.position.floored()
+    const candidates = []
+    for (let radius = 0; radius <= 6; radius += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        for (let dz = -radius; dz <= radius; dz += 1) {
+          if (radius > 0 && Math.max(Math.abs(dx), Math.abs(dz)) !== radius) continue
+          const base = new Vec3(start.x + dx, start.y, start.z + dz)
+          if (bounds && (base.x < bounds.minX || base.x > bounds.maxX ||
+              base.z < bounds.minZ || base.z > bounds.maxZ)) continue
+          const floor = this.bot.blockAt(base.offset(0, -1, 0))
+          if (!floor || this.isPassable(floor) || this.isLiquid(floor)) continue
+          let open = true
+          for (let y = base.y; y <= targetY + 1; y += 1) {
+            const block = this.bot.blockAt(new Vec3(base.x, y, base.z))
+            if (!this.isPassable(block) || this.isLiquid(block)) {
+              open = false
+              break
+            }
+          }
+          if (open) candidates.push(base)
+        }
+      }
+    }
+    let lastFailure = null
+    for (const base of candidates.slice(0, 12)) {
+      try {
+        if (this.bot.entity.position.distanceTo(base) > 0.9) {
+          await this.gotoBounded(new goals.GoalBlock(base.x, base.y, base.z), signal, 12, 3000)
+        }
+        if (this.bot.entity.position.distanceTo(base) > 0.9) continue
+        const result = await this.recoverStuck(new Vec3(base.x, targetY, base.z), signal, trackScaffold)
+        const reachedY = this.bot.entity.position.floored().y
+        if (reachedY >= targetY - 1) return `${result}; verified at Y ${reachedY}`
+        lastFailure = new Error(`tower goal completed at Y ${reachedY} instead of Y ${targetY}`)
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+        lastFailure = error
+      }
+    }
+    // If the completed floor sealed the bot into a crawlspace, create a
+    // temporary vertical access hole only through blocks owned by the active
+    // blueprint. The blueprint callback requeues every removed block so the
+    // escape cannot leave permanent damage.
+    if (clearAccess) {
+      let opened = 0
+      for (let y = start.y + 2; y <= targetY + 1; y += 1) {
+        const position = new Vec3(start.x, y, start.z)
+        const block = this.bot.blockAt(position)
+        if (this.isPassable(block) && !this.isLiquid(block)) continue
+        if (this.isLiquid(block) || !await clearAccess(position)) break
+        opened += 1
+      }
+      if (opened > 0) {
+        try {
+          const result = await this.recoverStuck(
+            new Vec3(start.x, targetY, start.z), signal, trackScaffold
+          )
+          const reachedY = this.bot.entity.position.floored().y
+          if (reachedY >= targetY - 1) {
+            return `${result}; verified at Y ${reachedY} through a temporary ${opened}-block access hole`
+          }
+          lastFailure = new Error(`access-hole tower completed at Y ${reachedY} instead of Y ${targetY}`)
+        } catch (error) {
+          if (error.name === 'AbortError') throw error
+          lastFailure = error
+        }
+      }
+    }
+    throw new Error(
+      `no verified open foundation escape reached Y ${targetY}` +
+      (lastFailure ? `: ${lastFailure.message}` : '')
+    )
+  }
+
+  async openBuildAccessToward(target, clearAccess, signal) {
+    if (!clearAccess) return 0
+    const start = this.bot.entity.position.floored()
+    // A horizontal doorway is only useful on the current work level. Opening
+    // a roof-level wall while pursuing a fixture several floors below merely
+    // damages the shell without creating a navigable route.
+    if (Math.abs(target.y - start.y) > 1) return 0
+    const dx = target.x - start.x
+    const dz = target.z - start.z
+    const steps = Math.max(Math.abs(dx), Math.abs(dz))
+    if (steps < 3) return 0
+    for (let index = 1; index <= steps - 2; index += 1) {
+      if (signal.aborted) throw abortError()
+      const x = start.x + Math.round(dx * index / steps)
+      const z = start.z + Math.round(dz * index / steps)
+      let opened = 0
+      for (const y of [start.y, start.y + 1]) {
+        const position = new Vec3(x, y, z)
+        const block = this.bot.blockAt(position)
+        if (this.isPassable(block) && !this.isLiquid(block)) continue
+        if (this.isLiquid(block) || !await clearAccess(position)) {
+          opened = 0
+          break
+        }
+        opened += 1
+      }
+      if (opened > 0) return opened
+    }
+    return 0
+  }
+
   async createExteriorPlacementStaircase(stance, bounds, signal, preserveItem = null, trackScaffold = null) {
     if (!bounds || !Number.isFinite(bounds.baseY)) return false
     const currentY = this.bot.entity.position.floored().y
@@ -1889,7 +2249,13 @@ class ActionExecutor {
         if (this.canStandAt(candidate)) unique.set(candidate.toString(), candidate)
       }
     }
+    const staircaseViability = (base) => {
+      const vertical = stance.y - base.y
+      const horizontal = Math.max(Math.abs(stance.x - base.x), Math.abs(stance.z - base.z))
+      return vertical >= 1 && vertical <= 12 && horizontal >= vertical && horizontal <= 16
+    }
     const approaches = [...unique.values()].sort((a, b) =>
+      Number(staircaseViability(b)) - Number(staircaseViability(a)) ||
       this.bot.entity.position.distanceTo(a) - this.bot.entity.position.distanceTo(b)
     )
     if (!approaches.length) {
@@ -1897,7 +2263,8 @@ class ActionExecutor {
       return false
     }
     let navigationFailures = 0
-    for (const base of approaches.slice(0, 16)) {
+    const approachLimit = Math.min(4, approaches.length)
+    for (const base of approaches.slice(0, approachLimit)) {
       try {
         await this.gotoBounded(new goals.GoalBlock(base.x, base.y, base.z), signal, 32)
       } catch (error) {
@@ -1910,7 +2277,7 @@ class ActionExecutor {
       )) return true
     }
     if (navigationFailures) {
-      console.warn(`Could not reach ${navigationFailures}/${Math.min(16, approaches.length)} exterior staging surfaces for ${stance}`)
+      console.warn(`Could not reach ${navigationFailures}/${approachLimit} exterior staging surfaces for ${stance}`)
     }
     return false
   }
@@ -2537,7 +2904,8 @@ class ActionExecutor {
             if (!chest) break
             placedAny = true
             const container = await cancellable(
-              this.bot.openContainer(chest), signal, () => this.bot.currentWindow?.close?.()
+              this.bot.openContainer(chest), signal, () => this.bot.currentWindow?.close?.(),
+              5000, `opening ${chest.name || 'container'} at ${chest.position}`
             )
             try {
               await unloadInto(false)(container, chest)
@@ -2672,6 +3040,20 @@ class ActionExecutor {
   }
 
   async tryWithdrawFromNearby(
+    itemName, quantity, signal,
+    { forceInspect = false, stayAtStorageWhenEmpty = false } = {}
+  ) {
+    return withDeadlineSignal(
+      (operationSignal) => this.tryWithdrawFromNearbyUnbounded(
+        itemName, quantity, operationSignal, { forceInspect, stayAtStorageWhenEmpty }
+      ),
+      signal,
+      20000,
+      `restocking ${itemName}`
+    )
+  }
+
+  async tryWithdrawFromNearbyUnbounded(
     itemName, quantity, signal,
     { forceInspect = false, stayAtStorageWhenEmpty = false } = {}
   ) {
@@ -2909,6 +3291,8 @@ class ActionExecutor {
     let reached = 0
     for (const original of entities) {
       if (signal.aborted) throw abortError()
+      this.unreachableDropCooldowns ||= new Map()
+      if ((this.unreachableDropCooldowns.get(original.id) || 0) > Date.now()) continue
       let entity = this.bot.entities[original.id]
       if (!entity?.position) continue
       try {
@@ -2946,10 +3330,16 @@ class ActionExecutor {
           const waitUntil = Math.min(deadline, Date.now() + 500)
           while (this.bot.entities[original.id]?.position && Date.now() < waitUntil) await wait(100, signal)
         }
-        if (!this.bot.entities[original.id]?.position) reached += 1
-        else console.warn(`Reached dropped item ${original.id}, but it was not picked up after three approaches`)
+        if (!this.bot.entities[original.id]?.position) {
+          this.unreachableDropCooldowns.delete(original.id)
+          reached += 1
+        } else {
+          this.unreachableDropCooldowns.set(original.id, Date.now() + 30000)
+          console.warn(`Reached dropped item ${original.id}, but it was not picked up; cooling it down for 30 seconds`)
+        }
       } catch (error) {
         if (error.name === 'AbortError') throw error
+        this.unreachableDropCooldowns.set(original.id, Date.now() + 30000)
         console.warn(`Skipped unreachable dropped item ${entity.id}: ${error.message}`)
       }
     }
@@ -2965,7 +3355,9 @@ class ActionExecutor {
     do {
       const drops = this.entityTracker.droppedItems(null, Math.max(radius + 2, 8))
         .filter(({ entity, item }) => entity?.position && entity.position.distanceTo(position) <= radius &&
-          (!allowed || allowed.has(item.name)))
+          (!allowed || allowed.has(item.name)) &&
+          this.inventoryTracker.canAccept([item.name]) &&
+          (this.unreachableDropCooldowns?.get(entity.id) || 0) <= Date.now())
         .map(({ entity }) => entity)
         .filter((entity) => !attempted.has(entity.id))
       if (drops.length) {
@@ -3045,7 +3437,7 @@ class ActionExecutor {
     }
     this.assertNearby(target)
     const targetBlock = this.bot.blockAt(target)
-    if (!targetBlock || (targetBlock.name !== 'air' && targetBlock.boundingBox !== 'empty')) {
+    if (!this.isEmptyPlacementCell(targetBlock)) {
       throw new Error(`Placement target ${target} is not empty`)
     }
     const item = this.bot.inventory.items().find((entry) => entry.name === action.block)
@@ -3121,6 +3513,12 @@ class ActionExecutor {
       // the schematic. Create support on the exact requested side if needed.
       faces = [desiredFacing]
     }
+    if (expectedBlock.endsWith('_button') || expectedBlock === 'lever') {
+      const attachment = String(action.properties?.face || 'wall')
+      if (attachment === 'wall' && desiredFacing) faces = [desiredFacing]
+      else if (attachment === 'floor') faces = [new Vec3(0, 1, 0)]
+      else if (attachment === 'ceiling') faces = [new Vec3(0, -1, 0)]
+    }
     if (['lantern', 'soul_lantern'].includes(expectedBlock) && action.properties?.hanging != null) {
       faces = String(action.properties.hanging) === 'true'
         ? [new Vec3(0, -1, 0)]
@@ -3185,6 +3583,26 @@ class ActionExecutor {
       const reference = this.bot.blockAt(target.minus(face))
       return eye.distanceTo(clickPoint) <= 4.5 && reference &&
         (typeof this.bot.canSeeBlock !== 'function' || this.bot.canSeeBlock(reference))
+    }
+    const accessFailures = []
+    const attemptAccess = (operation) => this.tryBuildAccessRoute(operation, signal, accessFailures)
+    const buildFeetY = this.bot.entity.position.floored().y
+    if (!placementInReach() && action.buildBounds &&
+        target.y >= action.buildBounds.baseY + 3 && target.y - buildFeetY >= 3) {
+      // A builder can fall into a foundation gap after replacing temporary
+      // supports. Before searching distant upper-floor stances, climb back to
+      // the nearest useful work level with the normal tracked scaffold tower.
+      const recoveryY = Math.min(target.y - 1, buildFeetY + 4)
+      try {
+        const result = await this.recoverBuildPit(
+          recoveryY, action.buildBounds, signal, action.openTemporaryBuildAccess,
+          action.trackTemporaryScaffold
+        )
+        console.log(`Build pit recovery: ${result}`)
+      } catch (error) {
+        if (error.name === 'AbortError') throw error
+        console.warn(`Build pit recovery could not reach Y ${recoveryY}: ${error.message}`)
+      }
     }
     if (!placementInReach()) {
       const reachGoal = this.bot.world?.getBlock && goals.GoalPlaceBlock
@@ -3264,6 +3682,39 @@ class ActionExecutor {
             await gotoPlacement(new goals.GoalCompositeAny(
               staging.map((position) => new goals.GoalBlock(position.x, position.y, position.z))
             ), 32)
+            const reachedLanding = staging.some((position) =>
+              this.bot.entity.position.distanceTo(position) <= 0.9
+            )
+            let verifiedLanding = reachedLanding
+            if (!verifiedLanding) {
+              // Some pathfinder versions resolve GoalCompositeAny without
+              // occupying a member. Probe nearby concrete landings with a
+              // strict deadline; an existing interior staircase can then be
+              // rediscovered without another scaffold tower.
+              const individualLandings = [...staging].sort((a, b) =>
+                this.bot.entity.position.distanceTo(a) - this.bot.entity.position.distanceTo(b) ||
+                Math.abs(target.y - a.y) - Math.abs(target.y - b.y)
+              )
+              for (const position of individualLandings.slice(0, 6)) {
+                try {
+                  await this.gotoBounded(
+                    new goals.GoalBlock(position.x, position.y, position.z), signal, 32, 5000
+                  )
+                  if (this.bot.entity.position.distanceTo(position) <= 0.9) {
+                    verifiedLanding = true
+                    break
+                  }
+                } catch (error) {
+                  if (error.name === 'AbortError') throw error
+                }
+              }
+            }
+            if (!verifiedLanding) {
+              throw new Error(
+                `interior staging goal completed without reaching a candidate; ` +
+                `feet=${this.bot.entity.position.floored()}`
+              )
+            }
             reachedInteriorStaging = true
             console.log(`Reached interior upper-floor staging at ${this.bot.entity.position.floored()} for ${target}`)
             const fromLanding = [...exactStances].sort((a, b) =>
@@ -3283,9 +3734,9 @@ class ActionExecutor {
                 this.bot.entity.position.distanceTo(a) - this.bot.entity.position.distanceTo(b)
               )
               for (const stance of fromUpperLanding.slice(0, 24)) {
-                const crossed = await this.createPlacementWalkway(
+                const crossed = await attemptAccess(() => this.createPlacementWalkway(
                   stance, signal, action.block, action.trackTemporaryScaffold
-                )
+                ))
                 if (crossed && placementInReach()) break
               }
             }
@@ -3297,10 +3748,10 @@ class ActionExecutor {
       }
       if (!placementInReach()) {
         scaffoldableStances.sort((a, b) => currentPosition.distanceTo(a) - currentPosition.distanceTo(b))
-        for (const stance of scaffoldableStances.slice(0, 24)) {
-          const climbed = await this.createPlacementStaircase(
+        for (const stance of scaffoldableStances.slice(0, 4)) {
+          const climbed = await attemptAccess(() => this.createPlacementStaircase(
             stance, signal, action.block, action.trackTemporaryScaffold
-          )
+          ))
           if (climbed && placementInReach()) break
         }
       }
@@ -3309,15 +3760,34 @@ class ActionExecutor {
         // structure, straight ramps often collide with walls or roof pieces.
         // Walk outside the footprint and approach the upper floor on a tracked
         // scaffold ramp, like a player building from exterior staging.
-        for (const stance of scaffoldableStances.slice(0, 24)) {
-          const climbed = await this.createExteriorPlacementStaircase(
+        for (const stance of scaffoldableStances.slice(0, 4)) {
+          const climbed = await attemptAccess(() => this.createExteriorPlacementStaircase(
             stance, action.buildBounds, signal, action.block, action.trackTemporaryScaffold
-          )
+          ))
           if (climbed && placementInReach()) break
         }
       }
     }
     if (!placementInReach()) {
+      if (action.openTemporaryBuildAccess) {
+        const opened = await this.openBuildAccessToward(
+          target, action.openTemporaryBuildAccess, signal
+        )
+        if (opened > 0) {
+          try {
+            await gotoPlacement(new goals.GoalNear(target.x, target.y, target.z, 2), 16)
+            if (placementInReach()) {
+              console.log(`Reached ${target} through a temporary ${opened}-block build doorway`)
+            }
+          } catch (error) {
+            if (error.name === 'AbortError') throw error
+          }
+        }
+      }
+    }
+    if (!placementInReach()) {
+      const missingScaffold = accessFailures.find((error) => /no dirt or stone blocks/i.test(error.message))
+      if (missingScaffold) throw missingScaffold
       throw new Error(
         `no player-reachable placement stance for ${action.block} at ${target}; ` +
         `feet=${this.bot.entity.position.floored()}`
@@ -3369,7 +3839,7 @@ class ActionExecutor {
     this.bot.clearControlStates?.()
     await wait(100, signal)
     const finalTarget = this.bot.blockAt(target)
-    if (!finalTarget || (finalTarget.name !== 'air' && finalTarget.boundingBox !== 'empty')) {
+    if (!this.isEmptyPlacementCell(finalTarget)) {
       if (finalTarget?.diggable && SCAFFOLD_BLOCKS.has(finalTarget.name)) {
         await this.clearBuildObstruction(target, signal, true)
         action.untrackTemporaryScaffold?.(target)
@@ -3429,7 +3899,7 @@ class ActionExecutor {
       await wait(100, signal)
       placed = this.bot.blockAt(target)
     }
-    if (placementError && this.isPassable(placed)) {
+    if (placementError && this.isEmptyPlacementCell(placed)) {
       // A busy server can drop an otherwise valid placement altogether, not
       // merely its acknowledgement. Retry once only after the grace period has
       // proved the destination is still empty, preventing accidental doubles.
@@ -3473,6 +3943,7 @@ class ActionExecutor {
     const mismatches = []
     if (placed?.name !== expectedBlock) mismatches.push(`block=${placed?.name || 'unloaded'} instead of ${expectedBlock}`)
     const strictProperties = new Set(['facing', 'axis', 'half'])
+    if (expectedBlock.endsWith('_button') || expectedBlock === 'lever') strictProperties.add('face')
     if (expectedBlock.endsWith('_bed')) strictProperties.add('part')
     if (expectedBlock.endsWith('_slab')) strictProperties.add('type')
     if (/(?:_door|_trapdoor|_fence_gate)$/.test(expectedBlock)) strictProperties.add('open')
@@ -3572,20 +4043,47 @@ class ActionExecutor {
 
   async clearBuildObstruction(position, signal, reclaimRequiredMaterial = false) {
     const block = this.bot.blockAt(position)
-    if (!block || this.isPassable(block)) return true
+    if (this.isEmptyPlacementCell(block)) return true
     if (!this.canClearBuildObstruction(block) && !(reclaimRequiredMaterial && block.diggable)) return false
     let cleared = false
     let lastDigError = null
     for (let attempt = 0; attempt < 2 && !cleared; attempt += 1) {
       const current = this.bot.blockAt(position)
-      if (!current || this.isPassable(current)) {
+      if (this.isEmptyPlacementCell(current)) {
         cleared = true
         break
       }
-      await this.bot.tool.equipForBlock(current, { requireHarvest: false, getFromChest: false })
+      const entityPosition = this.bot.entity?.position
+      const outOfReach = entityPosition && entityPosition.distanceTo(position) > 4.5
+      const cannotDig = typeof this.bot.canDigBlock === 'function' && !this.bot.canDigBlock(current)
+      if (outOfReach || cannotDig) {
+        try {
+          await this.gotoBounded(
+            new goals.GoalGetToBlock(position.x, position.y, position.z), signal, 16, 5000
+          )
+        } catch (error) {
+          if (error.name === 'AbortError') throw error
+          throw new Error(`cannot reach build obstruction at ${position}: ${error.message}`)
+        }
+        const refreshed = this.bot.blockAt(position)
+        if ((this.bot.entity?.position && this.bot.entity.position.distanceTo(position) > 4.5) ||
+            (typeof this.bot.canDigBlock === 'function' && refreshed && !this.bot.canDigBlock(refreshed))) {
+          throw new Error(`cannot reach build obstruction at ${position} after approach`)
+        }
+      }
+      await cancellable(
+        this.bot.tool.equipForBlock(current, { requireHarvest: false, getFromChest: false }),
+        signal,
+        () => {},
+        5000,
+        `tool selection for ${current.name}`
+      )
       lastDigError = null
       try {
-        await cancellable(this.bot.dig(current, true), signal, () => this.bot.stopDigging())
+        await cancellable(
+          this.bot.dig(current, true), signal, () => this.bot.stopDigging(), 8000,
+          `digging ${current.name} at ${position}`
+        )
       } catch (error) {
         if (error.name === 'AbortError') throw error
         lastDigError = error
@@ -3596,7 +4094,7 @@ class ActionExecutor {
       const confirmationDeadline = Date.now() + (lastDigError ? 1500 : 700)
       let clearSince = null
       while (Date.now() < confirmationDeadline) {
-        if (this.isPassable(this.bot.blockAt(position))) {
+        if (this.isEmptyPlacementCell(this.bot.blockAt(position))) {
           clearSince ||= Date.now()
           if (Date.now() - clearSince >= 250) {
             cleared = true
@@ -3736,7 +4234,8 @@ class ActionExecutor {
     if (!block) throw new Error(`No loaded block at ${position}`)
     if (CONTAINER_NAMES.has(block.name)) {
       const container = await cancellable(
-        this.bot.openContainer(block), signal, () => this.bot.currentWindow?.close?.()
+        this.bot.openContainer(block), signal, () => this.bot.currentWindow?.close?.(),
+        5000, `opening ${block.name} at ${block.position}`
       )
       try {
         this.containerTracker.record(block, container)
@@ -4043,13 +4542,16 @@ class ActionExecutor {
           await this.gotoBounded(
             new goals.GoalGetToBlock(position.x, position.y, position.z),
             signal,
-            Math.min(this.limits.pathSearchRadius || 32, Math.max(16, distance + 4))
+            Math.min(this.limits.pathSearchRadius || 32, Math.max(16, distance + 4)),
+            Math.min(10000, Math.max(5000, distance * 350))
           )
         }
         const container = await cancellable(
           this.bot.openContainer(this.bot.blockAt(position)),
           signal,
-          () => this.bot.currentWindow?.close?.()
+          () => this.bot.currentWindow?.close?.(),
+          5000,
+          `opening ${block.name} at ${position}`
         )
         this.landmarks?.remember(
           `container_${position.x}_${position.y}_${position.z}`,
@@ -4143,7 +4645,8 @@ class ActionExecutor {
           throw new Error('remembered container is missing; removed stale landmark')
         }
         const container = await cancellable(
-          this.bot.openContainer(block), signal, () => this.bot.currentWindow?.close?.()
+          this.bot.openContainer(block), signal, () => this.bot.currentWindow?.close?.(),
+          5000, `opening ${block.name} at ${position}`
         )
         try {
           const result = await operation(container, block)
